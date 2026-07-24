@@ -68,6 +68,24 @@ extern int GetFont;
 // CClientTools
 extern int NextParticleSystem;
 
+// BaseModUI
+extern int BaseModUIFrameSize;
+extern int BaseModUIVtableSize;
+extern int BaseModUIManagedHandle;
+extern int BaseModUIFooterHandle;
+extern int BaseModUIManagerTransitionFlag;
+extern int BaseModUIFrameWindowType;
+extern int BaseModUIFrameWindowPriority;
+extern int BaseModUIFrameTransitionFlag;
+extern int BaseModUISetVisible;
+extern int BaseModUIApplySchemeSettings;
+extern int BaseModUIOnCommand;
+extern int BaseModUIOnKeyCodePressed;
+extern int BaseModUISetProportional;
+extern int BaseModUISetAutoDelete;
+extern int BaseModUIOnOpen;
+extern int BaseModUIClose;
+
 // CBaseEntity
 extern int m_nTickBase;
 extern int m_bDucking;

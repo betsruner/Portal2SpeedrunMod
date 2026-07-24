@@ -1,5 +1,6 @@
 #include "VGui.hpp"
 
+#include "BaseModUI.hpp"
 #include "Client.hpp"
 #include "Console.hpp"
 #include "Engine.hpp"
@@ -18,6 +19,9 @@ REDECL(VGui::Paint);
 // CEngineVGui::Paint
 DETOUR(VGui::Paint, int mode)
 {
+    if (basemodui)
+        basemodui->EnsureMainMenuHook();
+
     // drawing custom gui only once per frame
     // flag is set by RenderView detour in client
     if (vgui->canDrawThisFrame) { 

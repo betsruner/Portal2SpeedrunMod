@@ -6,6 +6,7 @@
 #include "SMSM.hpp"
 
 #include "Modules/Client.hpp"
+#include "Modules/BaseModUI.hpp"
 #include "Modules/Server.hpp"
 #include "Modules/Console.hpp"
 #include "Modules/Engine.hpp"
@@ -22,6 +23,16 @@
 #include "Utils.hpp"
 #include "Utils/Memory.hpp"
 #include "Hud/Hud.hpp"
+
+namespace {
+class P2SMSettingsPanel final : public BaseModUI::Panel {
+};
+
+BaseModUI::Panel* CreateP2SMSettingsPanel()
+{
+    return new P2SMSettingsPanel();
+}
+}
 
 SMSM smsm;
 EXPOSE_SINGLE_INTERFACE_GLOBALVAR(SMSM, IServerPluginCallbacks, INTERFACEVERSION_ISERVERPLUGINCALLBACKS, smsm);
@@ -79,6 +90,10 @@ bool SMSM::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameServer
             this->modules->InitAll();
 
             if (engine && client && engine->hasLoaded && client->hasLoaded && server->hasLoaded) {
+
+                this->modules->AddModule<BaseModUIExtension>(&basemodui);
+                this->modules->InitAll();
+                BaseModUI::RegisterPanel({ "p2sm_settings", "P2SMSettings", &CreateP2SMSettingsPanel, true, true });
 
                 this->StartMainThread();
 

@@ -85,6 +85,9 @@
     <ClCompile Include="Modules\VGui.cpp">
       <Filter>Source\Modules</Filter>
     </ClCompile>
+    <ClCompile Include="Modules\BaseModUI.cpp">
+      <Filter>Source\Modules</Filter>
+    </ClCompile>
     <ClCompile Include="Hud\Hud.cpp">
       <Filter>Source\Hud</Filter>
     </ClCompile>
@@ -163,6 +166,9 @@
       <Filter>Source\Modules</Filter>
     </ClInclude>
     <ClInclude Include="Modules\VGui.hpp">
+      <Filter>Source\Modules</Filter>
+    </ClInclude>
+    <ClInclude Include="Modules\BaseModUI.hpp">
       <Filter>Source\Modules</Filter>
     </ClInclude>
     <ClInclude Include="Hud\Hud.hpp">

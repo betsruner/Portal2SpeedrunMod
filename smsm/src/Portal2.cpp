@@ -46,6 +46,23 @@ void Portal2::LoadOffsets()
     ChatPrintf = 22; // CBaseHudChat
     RenderView = 26;
 
+    BaseModUIFrameSize = 0x838;
+    BaseModUIVtableSize = 264;
+    BaseModUIManagedHandle = 0x328;
+    BaseModUIFooterHandle = 0x458;
+    BaseModUIManagerTransitionFlag = 0x578;
+    BaseModUIFrameWindowType = 0x274;
+    BaseModUIFrameWindowPriority = 0x278;
+    BaseModUIFrameTransitionFlag = 0x700;
+    BaseModUISetVisible = 5;
+    BaseModUIApplySchemeSettings = 60;
+    BaseModUIOnCommand = 68;
+    BaseModUIOnKeyCodePressed = 77;
+    BaseModUISetProportional = 106;
+    BaseModUISetAutoDelete = 214;
+    BaseModUIOnOpen = 251;
+    BaseModUIClose = 254;
+
     // server.dll
     m_hActiveWeapon = 2140; // CBaseEntity
     m_bCanFirePortal1 = 1500; // CBaseEntity
@@ -132,6 +149,23 @@ void Portal2::LoadOffsets()
     FindElement = 143; // cc_leaderboard_enable
     ChatPrintf = 25; // CBaseHudChat
     RenderView = 26;
+
+    BaseModUIFrameSize = 0xC68;
+    BaseModUIVtableSize = 293;
+    BaseModUIManagedHandle = 0x2E0;
+    BaseModUIFooterHandle = 0x410;
+    BaseModUIManagerTransitionFlag = 0x52C;
+    BaseModUIFrameWindowType = 0x270;
+    BaseModUIFrameWindowPriority = 0x274;
+    BaseModUIFrameTransitionFlag = 0xAFC;
+    BaseModUISetVisible = 34;
+    BaseModUIApplySchemeSettings = 89;
+    BaseModUIOnCommand = 97;
+    BaseModUIOnKeyCodePressed = 106;
+    BaseModUISetProportional = 135;
+    BaseModUISetAutoDelete = 243;
+    BaseModUIOnOpen = 280;
+    BaseModUIClose = 283;
 
     // server.so
     m_hActiveWeapon = 2164; // CBaseEntity

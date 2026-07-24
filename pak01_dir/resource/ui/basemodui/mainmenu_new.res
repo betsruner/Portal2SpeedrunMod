@@ -59,13 +59,38 @@
 		"enabled"					"1"
 		"tabPosition"				"0"
 		"navUp"						"BtnExtras"
-		"navDown"					"BtnOptions"
+		"navDown"					"BtnP2SMSettings"
 		"labelText"					"Speedrun Mod Coop"
 		"style"						"MainMenuButton"
 		"command"					"CoopPlay"
 		"ActivationType"			"1"
 	}
-	
+
+	"BtnP2SMSettings"
+	{
+		"ControlName"				"BaseModHybridButton"
+		"fieldName"					"BtnP2SMSettings"
+		"xpos"						"88"	[$GAMECONSOLE && ($GAMECONSOLEWIDE && !$ANAMORPHIC)]
+		"xpos"						"63"	[$GAMECONSOLE && (!$GAMECONSOLEWIDE || $ANAMORPHIC)]
+		"xpos"						"88"	[!$GAMECONSOLE && $WIN32WIDE]
+		"xpos"						"63"	[!$GAMECONSOLE && !$WIN32WIDE]
+		"ypos"						"340"	[$GAMECONSOLE]
+		"ypos"						"318"	[!$GAMECONSOLE]
+		"wide"						"280"
+		"tall"						"20"
+		"autoResize"				"1"
+		"pinCorner"					"0"
+		"visible"					"1"
+		"enabled"					"1"
+		"tabPosition"				"0"
+		"navUp"						"BtnCoOp"
+		"navDown"					"BtnOptions"
+		"labelText"					"P2SM Settings"
+		"style"						"MainMenuButton"
+		"command"					"smsm_open p2sm_settings"
+		"ActivationType"			"1"
+	}
+
 	"BtnOptions"
 	{
 		"ControlName"				"BaseModHybridButton"
@@ -74,8 +99,8 @@
 		"xpos"						"63"	[$GAMECONSOLE && (!$GAMECONSOLEWIDE || $ANAMORPHIC)]	
 		"xpos"						"88"	[!$GAMECONSOLE && $WIN32WIDE]
 		"xpos"						"63"	[!$GAMECONSOLE && !$WIN32WIDE]	
-		"ypos"						"340"	[$GAMECONSOLE]  
-		"ypos"						"318"	[!$GAMECONSOLE] 
+		"ypos"						"370"	[$GAMECONSOLE]
+		"ypos"						"348"	[!$GAMECONSOLE]
 		"wide"						"280"
 		"tall"						"20"
 		"autoResize"				"1"
@@ -83,7 +108,7 @@
 		"visible"					"1"
 		"enabled"					"1"
 		"tabPosition"				"0"
-		"navUp"						"BtnExtras"
+		"navUp"						"BtnP2SMSettings"
 		"navDown"					"BtnQuit"
 		"labelText"					"#PORTAL2_MainMenu_Options"
 		"style"						"MainMenuButton"
@@ -97,7 +122,7 @@
 		"fieldName"					"BtnQuit"
 		"xpos"						"88"	[$WIN32WIDE]
 		"xpos"						"63"	[!$WIN32WIDE]	
-		"ypos"						"348"
+		"ypos"						"378"
 		"wide"						"280"
 		"tall"						"20"
 		"autoResize"				"1"
