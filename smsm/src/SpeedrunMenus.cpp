@@ -29,15 +29,15 @@ private:
 void RegisterSpeedrunMenus()
 {
     // Main menu "Speedrun Mod" button -> pick Full Game or Challenge Mode.
-    Menus::Register({ "p2sm_mode_select", "P2SMModeSelect", PLACEHOLDER("p2sm_mode_select") });
-    Menus::Register({ "p2sm_full_game", "P2SMFullGame", PLACEHOLDER("p2sm_full_game") });
-    Menus::Register({ "p2sm_challenge_mode", "P2SMChallengeMode", PLACEHOLDER("p2sm_challenge_mode") });
+    Menus::Register({ "p2sm_mode_select", "P2SMModeSelect", "Speedrun Mod", PLACEHOLDER("p2sm_mode_select") });
+    Menus::Register({ "p2sm_full_game", "P2SMFullGame", "Full Game", PLACEHOLDER("p2sm_full_game") });
+    Menus::Register({ "p2sm_challenge_mode", "P2SMChallengeMode", "Challenge Mode", PLACEHOLDER("p2sm_challenge_mode") });
     // Options -> Speedrun Mod settings.
-    Menus::Register({ "p2sm_settings", "P2SMSettings", PLACEHOLDER("p2sm_settings") });
+    Menus::Register({ "p2sm_settings", "P2SMSettings", "Speedrun Mod", PLACEHOLDER("p2sm_settings") });
 
     // Navigation tests: a third level of pages and a popup.
-    Menus::Register({ "p2sm_test_page", "P2SMTestPage", PLACEHOLDER("p2sm_test_page") });
-    Menus::Register({ "p2sm_test_popup", "P2SMTestPopup", PLACEHOLDER("p2sm_test_popup"), false, Menus::Layer::Popup });
+    Menus::Register({ "p2sm_test_page", "P2SMTestPage", "Third Page", PLACEHOLDER("p2sm_test_page") });
+    Menus::Register({ "p2sm_test_popup", "P2SMTestPopup", "Popup", PLACEHOLDER("p2sm_test_popup"), false, Menus::Layer::Popup });
 }
 
 CON_COMMAND(menus_open, "menus_open <id> : Opens a custom menu panel over the active one.\n")

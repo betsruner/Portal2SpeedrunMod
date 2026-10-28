@@ -12,6 +12,7 @@ namespace {
 constexpr const char* GetPanelSingletonSignature = "A1 ? ? ? ? C3 CC CC CC CC CC CC CC CC CC CC 8A 81";
 constexpr const char* AllocateSignature = "55 8B EC A1 ? ? ? ? 8B 08 8B 11 8B 45 ? 8B 52 ? 50 FF D2 5D C3 CC CC CC CC CC CC CC CC CC 55 8B EC 53";
 constexpr const char* FrameConstructorSignature = "55 8B EC 53 56 33 DB 57 8B F1 39 5D ? 74 ? C7 46 ? ? ? ? ? C7 86 ? ? ? ? ? ? ? ? 8B 45 ? 8B 4D ? 53 53 6A";
+constexpr const char* SetDialogTitleSignature = "55 8B EC 83 EC 44 53 57 8B 7D 08 8B D9 89 5D FC 85 FF 0F 84 ? ? ? ? 8B 0D ? ? ? ? 8B 01 8B 50 28 56 57 FF D2 8D B3 A4 02 00 00";
 constexpr const char* OpenWindowSignature = "55 8B EC 83 EC ? 53 56 8B F1 F3 0F 10 86 ? ? ? ? 0F 2E 05";
 constexpr const char* HandleGetSignature = "8B 01 56 83 F8 ? 74 ? 8B 0D";
 constexpr const char* HandleSetSignature = "55 8B EC 51 56 8B 75 ? 89 4D ? 85 F6 74";
@@ -64,6 +65,7 @@ bool Resolve(const char* clientModule)
     return Find(clientModule, GetPanelSingletonSignature, functions.getPanelSingleton)
         && Find(clientModule, AllocateSignature, functions.allocate)
         && Find(clientModule, FrameConstructorSignature, functions.frameConstructor)
+        && Find(clientModule, SetDialogTitleSignature, functions.setDialogTitle)
         && Find(clientModule, OpenWindowSignature, functions.openWindow)
         && Find(clientModule, HandleGetSignature, functions.handleGet)
         && Find(clientModule, HandleSetSignature, functions.handleSet)
