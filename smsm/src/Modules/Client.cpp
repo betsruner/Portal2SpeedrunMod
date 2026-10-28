@@ -9,11 +9,11 @@
 #include "Modules/VGui.hpp"
 
 REDECL(Client::RenderView);
-DETOUR(Client::RenderView, const CViewSetup& view, int nClearFlags, int whatToDraw) {
+DETOUR(Client::RenderView, void* rect) {
     vgui->AllowCustomHudThisFrame();
     client->UpdatePortalGunIndicatorColor();
 
-    return client->RenderView(thisptr, view, nClearFlags, whatToDraw);
+    return client->RenderView(thisptr, rect);
 }
 
 CNewParticleEffect* Client::GetParticleSystem(CNewParticleEffect* prev) {

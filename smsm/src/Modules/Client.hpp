@@ -22,7 +22,8 @@ public:
 
 
 
-    DECL_DETOUR(RenderView, const CViewSetup& view, int nClearFlags, int whatToDraw);
+    // CHLClient::View_Render(vrect_t*)
+    DECL_DETOUR(RenderView, void* rect);
     //DECL_DETOUR(HudUpdate, unsigned int a2);
 public:
     Client();
