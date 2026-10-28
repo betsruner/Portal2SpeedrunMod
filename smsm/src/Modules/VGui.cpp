@@ -12,7 +12,7 @@
 #include "Offsets.hpp"
 #include "Utils.hpp"
 #include "CelesteMoveset.hpp"
-#include "CustomMenus.hpp"
+#include "MenuHost.hpp"
 
 REDECL(VGui::Paint);
 

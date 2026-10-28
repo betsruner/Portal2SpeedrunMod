@@ -9,3 +9,5 @@ smsm/config.mk
 COPY.bat
 .gitconfig
 pak01_dir.vpk
+custommenus/obj
+custommenus/custommenus.so

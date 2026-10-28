@@ -26,6 +26,11 @@ For more information and installation instructions, please visit [the website].
 SMSM is a basic plugin that Speedrun Mod uses to handle modes and settings, as
 well as some ad-hoc patches and hooks into the game.
 
+The custom menu panels come from CustomMenus (`custommenus/`), a separate library
+that SMSM loads from its own folder at runtime, so `custommenus.dll` (or
+`custommenus.so`) has to be installed next to `smsm.dll`. Its whole interface
+is `custommenus/include/CustomMenus.hpp`.
+
 1. Fork the repository
 2. Clone your fork
 3. Create a new branch
@@ -54,4 +59,5 @@ You'll need:
 
 ```bash
 make -j$(nproc)
+make -C ../custommenus -j$(nproc)
 ```

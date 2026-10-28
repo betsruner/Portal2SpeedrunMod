@@ -4,6 +4,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 15.0.28010.2016
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "chaos", "src\chaos.vcxproj", "{BA13479B-E6FE-4327-B16F-196BF3BE80FF}"
+	ProjectSection(ProjectDependencies) = postProject
+		{5E0C7A2B-3F1D-4B8E-9A64-C2D7E1F08B53} = {5E0C7A2B-3F1D-4B8E-9A64-C2D7E1F08B53}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CustomMenus", "..\custommenus\custommenus.vcxproj", "{5E0C7A2B-3F1D-4B8E-9A64-C2D7E1F08B53}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{48BE78A6-2CEE-4128-8B30-E22A7F324D88}"
 	ProjectSection(SolutionItems) = preProject
@@ -22,6 +27,10 @@ Global
 		{BA13479B-E6FE-4327-B16F-196BF3BE80FF}.Debug|x86.Build.0 = Debug|Win32
 		{BA13479B-E6FE-4327-B16F-196BF3BE80FF}.Release|x86.ActiveCfg = Release|Win32
 		{BA13479B-E6FE-4327-B16F-196BF3BE80FF}.Release|x86.Build.0 = Release|Win32
+		{5E0C7A2B-3F1D-4B8E-9A64-C2D7E1F08B53}.Debug|x86.ActiveCfg = Debug|Win32
+		{5E0C7A2B-3F1D-4B8E-9A64-C2D7E1F08B53}.Debug|x86.Build.0 = Debug|Win32
+		{5E0C7A2B-3F1D-4B8E-9A64-C2D7E1F08B53}.Release|x86.ActiveCfg = Release|Win32
+		{5E0C7A2B-3F1D-4B8E-9A64-C2D7E1F08B53}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

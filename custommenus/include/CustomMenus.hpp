@@ -2,10 +2,11 @@
 
 // Custom BaseModUI panels for Portal 2.
 //
-// This is the whole interface between the menu system and the plugin using it, so that the
-// menu system can live in its own module: the plugin gets a System from CreateMenuSystem and
-// only ever talks to it, and the panels it gets back, through virtual calls. Nothing here uses
-// STL types or needs anything from the other side to link.
+// The menu system is its own library (custommenus.dll / custommenus.so) that a plugin ships next
+// to itself and loads at runtime. This header is the whole interface between the two: the plugin
+// gets a System from the library's exported CreateMenuSystem and only ever talks to it, and the
+// panels it gets back, through virtual calls. Nothing here uses STL types or needs anything from
+// the other side to link.
 //
 // Panels are real CBaseModFrames built from Resource/UI/BaseModUI/<resource>.res, so they get
 // the game's transitions, footer and controller navigation. Any number of panels can be
