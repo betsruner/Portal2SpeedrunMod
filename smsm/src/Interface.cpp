@@ -22,16 +22,15 @@ Interface::Interface()
     , copy(nullptr)
 {
 }
-Interface::Interface(void* baseclass, bool copyVtable, bool autoHook, int vtableSize)
+Interface::Interface(void* baseclass, bool copyVtable, bool autoHook)
     : Interface()
 {
     this->baseclass = reinterpret_cast<uintptr_t**>(baseclass);
     this->vtable = *this->baseclass;
 
-    this->vtableSize = vtableSize;
-    if (!this->vtableSize)
-        while (this->vtable[this->vtableSize])
-            ++this->vtableSize;
+    while (this->vtable[this->vtableSize]) {
+        ++this->vtableSize;
+    }
 
     if (copyVtable) {
         this->CopyVtable();
@@ -76,14 +75,14 @@ bool Interface::Unhook(int index)
     }
     return false;
 }
-Interface* Interface::Create(void* ptr, bool copyVtable, bool autoHook, int vtableSize)
+Interface* Interface::Create(void* ptr, bool copyVtable, bool autoHook)
 {
-    return (ptr) ? new Interface(ptr, copyVtable, autoHook, vtableSize) : nullptr;
+    return (ptr) ? new Interface(ptr, copyVtable, autoHook) : nullptr;
 }
-Interface* Interface::Create(const char* filename, const char* interfaceSymbol, bool copyVtable, bool autoHook, int vtableSize)
+Interface* Interface::Create(const char* filename, const char* interfaceSymbol, bool copyVtable, bool autoHook)
 {
     auto ptr = Interface::GetPtr(filename, interfaceSymbol);
-    return (ptr) ? new Interface(ptr, copyVtable, autoHook, vtableSize) : nullptr;
+    return (ptr) ? new Interface(ptr, copyVtable, autoHook) : nullptr;
 }
 void Interface::Delete(Interface* ptr)
 {
