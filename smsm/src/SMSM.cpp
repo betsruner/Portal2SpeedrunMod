@@ -22,8 +22,8 @@
 #include "Utils.hpp"
 #include "Utils/Memory.hpp"
 #include "Hud/Hud.hpp"
-#include "Menus/Menus.hpp"
-#include "SpeedrunMenus.hpp"
+#include "Leaderboards.hpp"
+#include "CustomMenus.hpp"
 
 SMSM smsm;
 EXPOSE_SINGLE_INTERFACE_GLOBALVAR(SMSM, IServerPluginCallbacks, INTERFACEVERSION_ISERVERPLUGINCALLBACKS, smsm);
@@ -82,8 +82,7 @@ bool SMSM::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameServer
 
             if (engine && client && engine->hasLoaded && client->hasLoaded && server->hasLoaded) {
 
-                if (Menus::Init())
-                    RegisterSpeedrunMenus();
+                LoadMenus();
 
                 this->StartMainThread();
 
@@ -138,7 +137,8 @@ void SMSM::Cleanup() {
     if (this->cheats)
         this->cheats->Shutdown();
 
-    Menus::Shutdown();
+    UnloadMenus();
+    Leaderboards::Shutdown();
 
     if (this->modules)
         this->modules->ShutdownAll();

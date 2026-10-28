@@ -1,16 +1,16 @@
 #include "Menus.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include "Interface.hpp"
-#include "Modules/Console.hpp"
 #include "Native.hpp"
-#include "Utils.hpp"
+#include "Support.hpp"
 
 namespace Menus {
 
@@ -31,15 +31,7 @@ struct Registration {
     PanelFactory factory;
     bool footer;
     Layer layer;
-};
-
-struct Instance {
-    Panel* panel;
-    Interface* hooks;
-    Layer layer;
-    // vgui::PHandle, so frames the game deletes without closing them can be noticed.
-    int handle;
-    bool opened;
+    std::string footerPrimary;
 };
 
 bool ValidName(const char* value, size_t maxLength)
@@ -53,6 +45,480 @@ bool ValidName(const char* value, size_t maxLength)
     }
     return true;
 }
+
+constexpr int MouseLeft = 107;
+
+bool SetChildText(void* panel, const char* control, const char* text)
+{
+    void* child = panel && control ? functions.findChildByName(panel, control, true) : nullptr;
+    if (!child)
+        return false;
+    Virtual<Functions::LabelSetText>(child, layout.labelSetText)(child, text ? text : "");
+    return true;
+}
+
+constexpr int AvatarAddReference = 1;
+constexpr int AvatarRelease = 2;
+constexpr int AvatarSize = 2; // what stock leaderboard rows ask for
+// Cleared items are only deleted by vgui later, and may paint once more, so their avatar
+// references are released a few ticks after the clear.
+constexpr int AvatarReleaseDelay = 3;
+std::vector<std::pair<uint64_t, int>> pendingAvatarReleases; // steam id, ticks left
+// Avatars that aren't downloaded yet are retried this often.
+constexpr int AvatarRetryTicks = 30;
+std::unordered_map<uint64_t, bool> requestedUsers;
+
+// Steam only fetches avatars of players who aren't friends once asked about them.
+void RequestUser(uint64_t steamId)
+{
+    if (!functions.steamApiContext || !*functions.steamApiContext || requestedUsers.count(steamId))
+        return;
+    void* steamFriends = static_cast<void**>(*functions.steamApiContext)[2];
+    if (!steamFriends)
+        return;
+    Virtual<Functions::RequestUserInformation>(steamFriends, layout.steamFriendsRequestUserInformation)(steamFriends, steamId, false);
+    requestedUsers[steamId] = true;
+}
+
+void ReleasePendingAvatars()
+{
+    void* cache = functions.getUIGameData();
+    for (auto it = pendingAvatarReleases.begin(); it != pendingAvatarReleases.end();) {
+        if (--it->second > 0) {
+            ++it;
+            continue;
+        }
+        if (cache)
+            functions.accessAvatarImage(cache, it->first, AvatarRelease, AvatarSize);
+        it = pendingAvatarReleases.erase(it);
+    }
+}
+
+// vgui::Color is four bytes passed by value.
+int NativeColor(Color color)
+{
+    return color.r | color.g << 8 | color.b << 16 | color.a << 24;
+}
+
+class ListImpl;
+class SelectorImpl;
+
+// List items are plain EditablePanels holding Labels, ImagePanels and so on, and selectors are
+// plain Panels; none of them do anything when clicked or painted. OnMousePressed and Paint are
+// patched once per class, and the hooks only act on panels we own.
+std::unordered_map<void*, ListImpl*> listItems; // item -> the list that owns it
+std::unordered_map<void*, SelectorImpl*> selectors;
+std::unordered_map<uintptr_t*, uintptr_t> mouseVtables; // patched vtable -> original OnMousePressed
+std::unordered_map<uintptr_t*, uintptr_t> paintVtables; // patched vtable -> original Paint
+void SelectItem(ListImpl* list, void* item);
+void ClickSelector(SelectorImpl* selector);
+void PaintSelector(SelectorImpl* selector);
+MENUS_DECL_DETOUR(void, ItemOnMousePressed, int code);
+MENUS_DECL_DETOUR(void, PanelPaint);
+
+MENUS_DETOUR(void, PanelPaint)
+{
+    auto original = paintVtables.find(*reinterpret_cast<uintptr_t**>(thisptr));
+    if (original != paintVtables.end())
+        reinterpret_cast<_PanelPaint>(original->second)(thisptr);
+    auto selector = selectors.find(thisptr);
+    if (selector != selectors.end())
+        PaintSelector(selector->second);
+}
+
+MENUS_DETOUR(void, ItemOnMousePressed, int code)
+{
+    auto selector = code == MouseLeft ? selectors.find(thisptr) : selectors.end();
+    if (selector != selectors.end()) {
+        ClickSelector(selector->second);
+        return;
+    }
+    if (code == MouseLeft) {
+        void* panel = thisptr;
+        for (int depth = 0; panel && depth < 4; ++depth) {
+            auto owner = listItems.find(panel);
+            if (owner != listItems.end()) {
+                SelectItem(owner->second, panel);
+                return;
+            }
+            panel = Virtual<Functions::PanelGetParent>(panel, layout.getParent)(panel);
+        }
+    }
+    auto original = mouseVtables.find(*reinterpret_cast<uintptr_t**>(thisptr));
+    if (original != mouseVtables.end())
+        reinterpret_cast<_ItemOnMousePressed>(original->second)(thisptr, code);
+}
+
+void PatchVirtual(void* panel, int index, uintptr_t hook, std::unordered_map<uintptr_t*, uintptr_t>& originals)
+{
+    uintptr_t* vtable = *reinterpret_cast<uintptr_t**>(panel);
+    uintptr_t* entry = &vtable[index];
+    if (originals.count(vtable) || *entry == hook)
+        return;
+    Support::UnProtect(entry, sizeof(uintptr_t));
+    originals[vtable] = *entry;
+    *entry = hook;
+}
+
+void PatchMouse(void* panel)
+{
+    PatchVirtual(panel, layout.onMousePressed, reinterpret_cast<uintptr_t>(ItemOnMousePressed_Hook), mouseVtables);
+}
+
+// Patches the panel's class and the classes of everything inside it.
+void PatchMouseTree(void* panel)
+{
+    PatchMouse(panel);
+    void* panelInterface = *functions.panelInterface;
+    const uintptr_t vpanel = VPanelOf(panel);
+    const int count = Virtual<Functions::PanelGetChildCount>(panelInterface, layout.panelGetChildCount)(panelInterface, vpanel);
+    for (int i = 0; i < count; ++i) {
+        const uintptr_t child = Virtual<Functions::PanelGetChild>(panelInterface, layout.panelGetChild)(panelInterface, vpanel, i);
+        void* childPanel = Virtual<Functions::PanelGetPanel>(panelInterface, layout.panelGetPanel)(panelInterface, child, functions.controlsModuleName());
+        if (childPanel)
+            PatchMouseTree(childPanel);
+    }
+}
+
+void RestoreMouse()
+{
+    for (auto& item : mouseVtables)
+        item.first[layout.onMousePressed] = item.second;
+    for (auto& item : paintVtables)
+        item.first[layout.paint] = item.second;
+    mouseVtables.clear();
+    paintVtables.clear();
+    listItems.clear();
+    selectors.clear();
+}
+
+// The stock list button colors (HybridButton.ListButtonActiveColor / InactiveColor).
+constexpr Color SelectorActiveColor { 255, 255, 255, 255 };
+constexpr Color SelectorInactiveColor { 255, 255, 255, 60 };
+constexpr const char* SelectorSeparator = "/";
+
+class SelectorImpl final : public Selector {
+public:
+    SelectorImpl(void* panel, const char* fontName)
+        : panel(panel)
+        , fontName(fontName)
+    {
+    }
+
+    void SetOptions(const char* const* options, int count) override
+    {
+        this->options.assign(options, options + (count > 0 ? count : 0));
+        this->selected = this->options.empty() ? -1 : std::min(std::max(this->selected, 0), this->Count() - 1);
+    }
+
+    int Count() override { return static_cast<int>(this->options.size()); }
+    int Selected() override { return this->selected; }
+
+    void Select(int index) override
+    {
+        const int count = this->Count();
+        if (count)
+            this->selected = (index % count + count) % count;
+    }
+
+    void ApplyScheme(void* scheme)
+    {
+        this->font = Virtual<Functions::SchemeGetFont>(scheme, layout.schemeGetFont)(scheme, this->fontName.c_str(), true);
+    }
+
+    void Paint()
+    {
+        if (!this->font)
+            return;
+        void* surface = functions.surface;
+        void* panelInterface = *functions.panelInterface;
+        int wide = 0, tall = 0;
+        Virtual<Functions::PanelGetInts>(panelInterface, layout.panelGetSize)(panelInterface, VPanelOf(this->panel), wide, tall);
+        const int fontTall = Virtual<Functions::SurfaceGetFontTall>(surface, layout.surfaceGetFontTall)(surface, this->font);
+        auto setColor = Virtual<Functions::SurfaceDrawSetColor>(surface, layout.surfaceDrawSetColor);
+        auto fillRect = Virtual<Functions::SurfaceDrawFilledRect>(surface, layout.surfaceDrawFilledRect);
+        auto drawText = Virtual<Functions::SurfaceDrawColoredText>(surface, layout.surfaceDrawColoredText);
+        auto getTextSize = Virtual<Functions::SurfaceGetTextSize>(surface, layout.surfaceGetTextSize);
+        auto textWidth = [&](const char* text) {
+            std::wstring wide(text, text + std::strlen(text)); // option names are expected to be ASCII
+            int textWide = 0, textTall = 0;
+            getTextSize(surface, this->font, wide.c_str(), textWide, textTall);
+            return textWide;
+        };
+
+        // Arrow triangles, tips pointing outwards.
+        const int arrow = std::max(3, fontTall / 3);
+        const int inset = arrow * 2;
+        const int middle = tall / 2;
+        setColor(surface, SelectorActiveColor.r, SelectorActiveColor.g, SelectorActiveColor.b, SelectorActiveColor.a);
+        for (int column = 0; column < arrow; ++column) {
+            fillRect(surface, inset + column, middle - column, inset + column + 1, middle + column + 1);
+            fillRect(surface, wide - inset - column - 1, middle - column, wide - inset - column, middle + column + 1);
+        }
+        this->leftArrowEnd = inset + arrow + inset / 2;
+        this->rightArrowStart = wide - this->leftArrowEnd;
+
+        // Options in a row, separated like the stock "PORTALS / TIME". When they don't all fit
+        // between the arrows, show the run around the selected one that does.
+        this->spans.assign(this->options.size(), { 0, 0 });
+        if (this->selected < 0)
+            return;
+        const int gap = std::max(2, fontTall / 3); // drawn text skips leading spaces, so pad explicitly
+        const int slashWide = textWidth(SelectorSeparator);
+        const int separatorWide = slashWide + gap * 2;
+        std::vector<int> widths;
+        for (auto& option : this->options)
+            widths.push_back(textWidth(option.c_str()));
+
+        const int available = this->rightArrowStart - this->leftArrowEnd;
+        int first = this->selected, last = this->selected, total = widths[this->selected];
+        for (bool grew = true; grew;) {
+            grew = false;
+            if (last + 1 < this->Count() && total + separatorWide + widths[last + 1] <= available) {
+                total += separatorWide + widths[++last];
+                grew = true;
+            }
+            if (first > 0 && total + separatorWide + widths[first - 1] <= available) {
+                total += separatorWide + widths[--first];
+                grew = true;
+            }
+        }
+
+        int x = (wide - total) / 2;
+        const int y = (tall - fontTall) / 2;
+        for (int i = first; i <= last; ++i) {
+            const Color& color = i == this->selected ? SelectorActiveColor : SelectorInactiveColor;
+            drawText(surface, this->font, x, y, color.r, color.g, color.b, color.a, "%s", this->options[i].c_str());
+            this->spans[i] = { x, x + widths[i] };
+            x += widths[i];
+            if (i < last) {
+                const Color& inactive = SelectorInactiveColor;
+                drawText(surface, this->font, x + gap, y, inactive.r, inactive.g, inactive.b, inactive.a, "%s", SelectorSeparator);
+                x += separatorWide;
+            }
+        }
+    }
+
+    void Click()
+    {
+        int cursorX = 0, cursorY = 0, panelX = 0, panelY = 0;
+        Virtual<Functions::InputGetCursorPos>(functions.input, layout.inputGetCursorPos)(functions.input, cursorX, cursorY);
+        void* panelInterface = *functions.panelInterface;
+        Virtual<Functions::PanelGetInts>(panelInterface, layout.panelGetAbsPos)(panelInterface, VPanelOf(this->panel), panelX, panelY);
+        const int x = cursorX - panelX;
+
+        if (x < this->leftArrowEnd) {
+            this->Select(this->selected - 1);
+        } else if (x >= this->rightArrowStart) {
+            this->Select(this->selected + 1);
+        } else {
+            for (int i = 0; i < static_cast<int>(this->spans.size()); ++i) {
+                if (x >= this->spans[i].first && x < this->spans[i].second)
+                    this->Select(i);
+            }
+        }
+    }
+
+private:
+    void* panel;
+    std::string fontName;
+    unsigned long font = 0;
+    std::vector<std::string> options;
+    int selected = -1;
+    // Where things were drawn last paint, for clicks.
+    std::vector<std::pair<int, int>> spans;
+    int leftArrowEnd = 0;
+    int rightArrowStart = 0;
+};
+
+void ClickSelector(SelectorImpl* selector)
+{
+    selector->Click();
+}
+
+void PaintSelector(SelectorImpl* selector)
+{
+    selector->Paint();
+}
+
+class ListImpl final : public List {
+public:
+    ListImpl(void* frame, void* list)
+        : frame(frame)
+        , list(list)
+    {
+    }
+
+    ~ListImpl()
+    {
+        this->Forget();
+    }
+
+    void Clear() override
+    {
+        Virtual<Functions::FrameVoid>(this->list, layout.listRemoveAllItems)(this->list);
+        this->Forget();
+    }
+
+    int Add(const char* resource) override
+    {
+        if (!ValidName(resource, MaxResourceLength))
+            return -1;
+        // Same factory the .res loader uses, so any registered control could be an item.
+        void* item = Virtual<Functions::CreateControlByName>(this->frame, layout.createControlByName)(this->frame, "EditablePanel");
+        if (!item)
+            return -1;
+
+        char path[64];
+        std::snprintf(path, sizeof(path), "Resource/UI/BaseModUI/%s.res", resource);
+        functions.utlStringSet(&Field<char>(item, layout.panelName), resource);
+        Virtual<Functions::FrameBool>(item, layout.setProportional)(item, true);
+        Virtual<Functions::LoadControlSettings>(item, layout.loadControlSettings)(item, path, nullptr, nullptr, nullptr);
+        Virtual<Functions::ListAddItem>(this->list, layout.listAddItem)(this->list, item, true);
+        PatchMouseTree(item);
+        listItems[item] = this;
+        this->items.push_back(item);
+        return static_cast<int>(this->items.size()) - 1;
+    }
+
+    int Count() override { return static_cast<int>(this->items.size()); }
+
+    bool SetItemText(int index, const char* control, const char* text) override
+    {
+        return index >= 0 && index < this->Count() && SetChildText(this->items[index], control, text);
+    }
+
+    bool SetItemAvatar(int index, const char* control, unsigned long long steamId) override
+    {
+        if (index < 0 || index >= this->Count() || !control || !steamId)
+            return false;
+        if (!this->LoadAvatar(this->items[index], control, steamId)) {
+            RequestUser(steamId);
+            this->pendingAvatars.push_back({ this->items[index], control, steamId });
+        }
+        return true;
+    }
+
+    void RetryAvatars()
+    {
+        auto loaded = [this](const PendingAvatar& avatar) { return this->LoadAvatar(avatar.item, avatar.control.c_str(), avatar.steamId); };
+        this->pendingAvatars.erase(std::remove_if(this->pendingAvatars.begin(), this->pendingAvatars.end(), loaded), this->pendingAvatars.end());
+    }
+
+    bool SetItemBackground(int index, Color color) override
+    {
+        if (index < 0 || index >= this->Count())
+            return false;
+        Virtual<Functions::FrameInt>(this->items[index], layout.setBgColor)(this->items[index], NativeColor(color));
+        return true;
+    }
+
+    bool SetItemTextColor(int index, const char* control, Color color) override
+    {
+        void* child = index >= 0 && index < this->Count() && control ? functions.findChildByName(this->items[index], control, true) : nullptr;
+        if (!child)
+            return false;
+        Virtual<Functions::FrameInt>(child, layout.setFgColor)(child, NativeColor(color));
+        return true;
+    }
+
+    int Selected() override
+    {
+        void* selected = Field<void*>(this->list, layout.listSelectedItem);
+        auto found = std::find(this->items.begin(), this->items.end(), selected);
+        return found == this->items.end() || !selected ? -1 : static_cast<int>(found - this->items.begin());
+    }
+
+    void Select(int index) override
+    {
+        if (index >= 0 && index < this->Count())
+            Virtual<Functions::ListSelectItem>(this->list, layout.listSelectItem)(this->list, static_cast<unsigned short>(index), 1, true, true, false);
+    }
+
+    void Select(void* item)
+    {
+        auto found = std::find(this->items.begin(), this->items.end(), item);
+        if (found != this->items.end())
+            this->Select(static_cast<int>(found - this->items.begin()));
+    }
+
+    void ApplyScheme()
+    {
+        Virtual<Functions::FrameBool>(this->list, layout.listSetScrollBarVisible)(this->list, true);
+        Virtual<Functions::FrameBool>(this->list, layout.listSetScrollArrowsVisible)(this->list, false);
+    }
+
+private:
+    struct PendingAvatar {
+        void* item;
+        std::string control;
+        uint64_t steamId;
+    };
+
+    bool LoadAvatar(void* item, const char* control, uint64_t steamId)
+    {
+        void* imagePanel = functions.findChildByName(item, control, true);
+        void* cache = imagePanel ? functions.getUIGameData() : nullptr;
+        void* image = cache ? functions.accessAvatarImage(cache, steamId, AvatarAddReference, AvatarSize) : nullptr;
+        if (!image)
+            return false;
+        Virtual<Functions::FrameVoidPointer>(imagePanel, layout.imagePanelSetImage)(imagePanel, image);
+        this->avatars.push_back(steamId);
+        return true;
+    }
+
+    void Forget()
+    {
+        for (void* item : this->items)
+            listItems.erase(item);
+        this->items.clear();
+        this->pendingAvatars.clear();
+        for (uint64_t steamId : this->avatars)
+            pendingAvatarReleases.emplace_back(steamId, AvatarReleaseDelay);
+        this->avatars.clear();
+    }
+
+    void* frame;
+    void* list;
+    std::vector<void*> items;
+    std::vector<uint64_t> avatars; // references this list holds in the avatar cache
+    std::vector<PendingAvatar> pendingAvatars;
+};
+
+void SelectItem(ListImpl* list, void* item)
+{
+    list->Select(item);
+}
+
+// What a panel's helpers (Panel::Close and so on) call into.
+class FrameImpl final : public Frame {
+public:
+    explicit FrameImpl(void* frame)
+        : frame(frame)
+    {
+    }
+
+    void* Native() override { return this->frame; }
+    void Close() override;
+    bool SetControlText(const char* control, const char* text) override;
+    List* CreateList(const char* name) override;
+    Selector* CreateSelector(const char* name, const char* font) override;
+
+private:
+    void* frame;
+};
+
+struct Instance {
+    Panel* panel;
+    Support::VtableHook* hooks;
+    FrameImpl* access;
+    Layer layer;
+    // vgui::PHandle, so frames the game deletes without closing them can be noticed.
+    int handle;
+    bool opened;
+    std::vector<ListImpl*> lists;
+    std::vector<SelectorImpl*> selectors;
+};
 
 // Returns the argument if command is "<name> <argument>", otherwise nullptr.
 const char* CommandArgument(const char* command, const char* name)
@@ -83,11 +549,13 @@ public:
     static uintptr_t stockOnCommand[WindowTypeCount];
 
     // Custom frames
-    DECL_DETOUR_T(void, OnCommand, const char* command);
-    DECL_DETOUR_T(void, OnOpen);
-    DECL_DETOUR_T(void, OnClose);
+    MENUS_DECL_DETOUR(void, ApplySchemeSettings, void* scheme);
+    MENUS_DECL_DETOUR(void, OnCommand, const char* command);
+    MENUS_DECL_DETOUR(void, OnKeyCodePressed, int code);
+    MENUS_DECL_DETOUR(void, OnOpen);
+    MENUS_DECL_DETOUR(void, OnClose);
     // Stock frames
-    DECL_DETOUR_T(void, StockOnCommand, const char* command);
+    MENUS_DECL_DETOUR(void, StockOnCommand, const char* command);
 
     static void* Manager() { return functions.getPanelSingleton(); }
     static void* SlotHandle(void* manager, int windowType) { return &Field<int>(manager, layout.frames + windowType * sizeof(int)); }
@@ -113,7 +581,7 @@ public:
     {
         auto found = registrations.find(id);
         if (found == registrations.end()) {
-            console->Warning("menus: No panel is registered as '%s'.\n", id);
+            Support::Warning("menus: No panel is registered as '%s'.\n", id);
             return false;
         }
         void* manager = Manager();
@@ -148,19 +616,27 @@ public:
         if (registration.footer) {
             void* footer = functions.handleGet(&Field<int>(manager, layout.footer));
             if (footer) {
-                functions.footerSetButtons(footer, 2, 1, 0, 0);
+                // Footer button flags: 1 is A (primary), 2 is B (Back).
+                const bool primary = !registration.footerPrimary.empty();
+                functions.footerSetButtons(footer, primary ? 3 : 2, 1, 0, 0);
+                if (primary)
+                    functions.footerSetButtonText(footer, 1, registration.footerPrimary.c_str(), false, 0);
                 functions.footerSetButtonText(footer, 2, "#L4D360UI_Back", false, 0);
             }
         }
 
-        Interface* hooks = Interface::Create(frame, true, true, layout.vtableSize);
-        hooks->Hook(OnCommand_Hook, OnCommand, layout.onCommand);
-        hooks->Hook(OnOpen_Hook, OnOpen, layout.onOpen);
-        hooks->Hook(OnClose_Hook, OnClose, layout.onClose);
+        auto hooks = new Support::VtableHook(frame, layout.vtableSize);
+        hooks->Hook(layout.applySchemeSettings, ApplySchemeSettings_Hook, ApplySchemeSettings);
+        hooks->Hook(layout.onCommand, OnCommand_Hook, OnCommand);
+        hooks->Hook(layout.onKeyCodePressed, OnKeyCodePressed_Hook, OnKeyCodePressed);
+        hooks->Hook(layout.onOpen, OnOpen_Hook, OnOpen);
+        hooks->Hook(layout.onClose, OnClose_Hook, OnClose);
 
-        panel->frame = frame;
-        Instance& instance = instances.emplace(frame, Instance { panel, hooks, registration.layer, -1, false }).first->second;
+        auto access = new FrameImpl(frame);
+        panel->frame = access;
+        Instance& instance = instances.emplace(frame, Instance { panel, hooks, access, registration.layer, -1, false, {} }).first->second;
         functions.handleSet(&instance.handle, frame);
+        panel->OnCreate();
         StackFor(registration.layer).push_back(frame);
 
         // OpenWindow only builds frames for the types it knows. With the slot already holding
@@ -169,7 +645,7 @@ public:
         int windowType = slot;
         void* opened = functions.openWindow(manager, &windowType, caller, registration.layer == Layer::Page, nullptr);
         if (opened != frame) {
-            console->Warning("menus: The game refused to open '%s'.\n", id);
+            Support::Warning("menus: The game refused to open '%s'.\n", id);
             Virtual<Functions::FrameVoid>(frame, layout.onClose)(frame);
             return false;
         }
@@ -220,9 +696,18 @@ public:
         instance.panel->OnClose();
         instance.panel->frame = nullptr;
         instance.panel->Release();
+        delete instance.access;
+        // The native lists and selector panels are children of the frame and go with it.
+        for (ListImpl* list : instance.lists)
+            delete list;
+        for (SelectorImpl* selector : instance.selectors) {
+            for (auto it = selectors.begin(); it != selectors.end();)
+                it = it->second == selector ? selectors.erase(it) : std::next(it);
+            delete selector;
+        }
         if (!frameAlive)
             instance.hooks->Forget();
-        Interface::Delete(instance.hooks);
+        delete instance.hooks;
     }
 
     // Forgets frames the game deleted without closing them.
@@ -238,6 +723,18 @@ public:
                 stack.erase(std::remove(stack.begin(), stack.end(), frame), stack.end());
             Destroy(frame, false);
         }
+    }
+
+    // Forgets every panel without touching its (already deleted) frame.
+    static void Abandon()
+    {
+        std::vector<void*> frames;
+        for (auto& item : instances)
+            frames.push_back(item.first);
+        for (void* frame : frames)
+            Destroy(frame, false);
+        for (auto& stack : stacks)
+            stack.clear();
     }
 
     static void CloseAll()
@@ -268,7 +765,7 @@ public:
             }
 
             uintptr_t* entry = &vtable[layout.onCommand];
-            Memory::UnProtect(entry, sizeof(uintptr_t));
+            Support::UnProtect(entry, sizeof(uintptr_t));
             patchedVtables[vtable] = stockOnCommand[windowType] = *entry;
             *entry = reinterpret_cast<uintptr_t>(StockOnCommand_Hook);
         }
@@ -290,12 +787,27 @@ std::vector<void*> MenuSystem::stacks[2];
 std::unordered_map<uintptr_t*, uintptr_t> MenuSystem::patchedVtables;
 uintptr_t MenuSystem::stockOnCommand[WindowTypeCount] = {};
 
-REDECL(MenuSystem::OnCommand);
-REDECL(MenuSystem::OnOpen);
-REDECL(MenuSystem::OnClose);
-REDECL(MenuSystem::StockOnCommand);
+MENUS_REDECL(MenuSystem::ApplySchemeSettings);
+MENUS_REDECL(MenuSystem::OnCommand);
+MENUS_REDECL(MenuSystem::OnKeyCodePressed);
+MENUS_REDECL(MenuSystem::OnOpen);
+MENUS_REDECL(MenuSystem::OnClose);
+MENUS_REDECL(MenuSystem::StockOnCommand);
 
-DETOUR_T(void, MenuSystem::OnCommand, const char* command)
+MENUS_DETOUR(void, MenuSystem::ApplySchemeSettings, void* scheme)
+{
+    // This is also where the frame loads its .res, styling the lists created in OnCreate.
+    ApplySchemeSettings(thisptr, scheme);
+    auto found = instances.find(thisptr);
+    if (found != instances.end()) {
+        for (ListImpl* list : found->second.lists)
+            list->ApplyScheme();
+        for (SelectorImpl* selector : found->second.selectors)
+            selector->ApplyScheme(scheme);
+    }
+}
+
+MENUS_DETOUR(void, MenuSystem::OnCommand, const char* command)
 {
     if (DispatchCommand(thisptr, command))
         return;
@@ -305,7 +817,15 @@ DETOUR_T(void, MenuSystem::OnCommand, const char* command)
     OnCommand(thisptr, command);
 }
 
-DETOUR_T(void, MenuSystem::OnOpen)
+MENUS_DETOUR(void, MenuSystem::OnKeyCodePressed, int code)
+{
+    auto found = instances.find(thisptr);
+    if (found != instances.end() && found->second.panel->OnKeyCodePressed(code))
+        return;
+    OnKeyCodePressed(thisptr, code);
+}
+
+MENUS_DETOUR(void, MenuSystem::OnOpen)
 {
     OnOpen(thisptr);
     auto found = instances.find(thisptr);
@@ -318,7 +838,7 @@ DETOUR_T(void, MenuSystem::OnOpen)
     found->second.panel->OnActivate();
 }
 
-DETOUR_T(void, MenuSystem::OnClose)
+MENUS_DETOUR(void, MenuSystem::OnClose)
 {
     auto found = instances.find(thisptr);
     void* manager = Manager();
@@ -358,7 +878,7 @@ DETOUR_T(void, MenuSystem::OnClose)
     }
 }
 
-DETOUR_T(void, MenuSystem::StockOnCommand, const char* command)
+MENUS_DETOUR(void, MenuSystem::StockOnCommand, const char* command)
 {
     if (DispatchCommand(thisptr, command)) {
         functions.releaseActiveMenuControl(0);
@@ -379,39 +899,110 @@ DETOUR_T(void, MenuSystem::StockOnCommand, const char* command)
         reinterpret_cast<_StockOnCommand>(original)(thisptr, command);
 }
 
-void Panel::Close()
+void FrameImpl::Close()
 {
     if (this->frame && MenuSystem::loaded)
         MenuSystem::NavigateBack(this->frame);
 }
 
-bool Init()
+bool FrameImpl::SetControlText(const char* control, const char* text)
+{
+    return MenuSystem::loaded && SetChildText(this->frame, control, text);
+}
+
+List* FrameImpl::CreateList(const char* name)
+{
+    auto found = this->frame ? MenuSystem::instances.find(this->frame) : MenuSystem::instances.end();
+    if (found == MenuSystem::instances.end() || found->second.opened || !ValidName(name, 63))
+        return nullptr;
+    void* list = functions.allocate(layout.listSize);
+    if (!list)
+        return nullptr;
+    // Same arguments the stock leaderboard uses for its lists.
+    functions.listConstructor(list, this->frame, name, 5, true);
+    ListImpl* wrapper = new ListImpl(this->frame, list);
+    found->second.lists.push_back(wrapper);
+    return wrapper;
+}
+
+Selector* FrameImpl::CreateSelector(const char* name, const char* font)
+{
+    auto found = this->frame ? MenuSystem::instances.find(this->frame) : MenuSystem::instances.end();
+    if (found == MenuSystem::instances.end() || found->second.opened || !ValidName(name, 63) || !font)
+        return nullptr;
+    void* panel = Virtual<Functions::CreateControlByName>(this->frame, layout.createControlByName)(this->frame, "Panel");
+    if (!panel)
+        return nullptr;
+
+    // Named and parented now so the frame's .res finds it and applies its settings.
+    functions.utlStringSet(&Field<char>(panel, layout.panelName), name);
+    Virtual<Functions::FrameBool>(panel, layout.setProportional)(panel, true);
+    void* panelInterface = *functions.panelInterface;
+    Virtual<Functions::PanelSetParent>(panelInterface, layout.panelSetParent)(panelInterface, VPanelOf(panel), VPanelOf(this->frame));
+    PatchVirtual(panel, layout.paint, reinterpret_cast<uintptr_t>(PanelPaint_Hook), paintVtables);
+    PatchMouse(panel);
+
+    SelectorImpl* selector = new SelectorImpl(panel, font);
+    selectors[panel] = selector;
+    found->second.selectors.push_back(selector);
+    return selector;
+}
+
+namespace {
+class SystemImpl final : public System {
+public:
+    bool Init() override;
+    void Shutdown() override;
+    bool IsAvailable() override;
+    void Tick() override;
+    bool Register(const PanelDesc& desc) override;
+    bool Unregister(const char* id) override;
+    bool Open(const char* id) override;
+    bool OpenNative(int windowType) override;
+    bool Back() override;
+    void Dump() override;
+};
+
+SystemImpl menuSystem;
+}
+
+bool SystemImpl::Init()
 {
     if (MenuSystem::loaded)
         return true;
-    if (!Native::Resolve(MODULE("client"))) {
-        console->Warning("menus: BaseModUI integration is unavailable on this game build; custom panels are disabled.\n");
+    if (!Native::Resolve(MENUS_MODULE("client"))) {
+        Support::Warning("menus: BaseModUI integration is unavailable on this game build; custom panels are disabled.\n");
         return false;
     }
     return MenuSystem::loaded = true;
 }
 
-void Shutdown()
+void SystemImpl::Shutdown()
 {
     if (!MenuSystem::loaded)
         return;
-    MenuSystem::CloseAll();
+    if (*functions.vgui) {
+        MenuSystem::Prune();
+        MenuSystem::CloseAll();
+    } else {
+        // The game is quitting: vgui shut down and deleted every window before unloading plugins,
+        // so there's nothing left to close and nothing in vgui to call.
+        MenuSystem::Abandon();
+    }
     MenuSystem::RestoreStockWindows();
+    RestoreMouse();
+    // Frames closed just now may still paint, so their avatars are left referenced.
+    pendingAvatarReleases.clear();
     MenuSystem::registrations.clear();
     MenuSystem::loaded = false;
 }
 
-bool IsAvailable()
+bool SystemImpl::IsAvailable()
 {
     return MenuSystem::loaded;
 }
 
-void Tick()
+void SystemImpl::Tick()
 {
     if (!MenuSystem::loaded)
         return;
@@ -420,34 +1011,54 @@ void Tick()
         return;
     MenuSystem::Prune();
     MenuSystem::PatchStockWindows(manager);
+    ReleasePendingAvatars();
+
+    static int avatarTicks = 0;
+    if (++avatarTicks >= AvatarRetryTicks) {
+        avatarTicks = 0;
+        for (auto& item : MenuSystem::instances) {
+            for (ListImpl* list : item.second.lists)
+                list->RetryAvatars();
+        }
+    }
+
+    // A panel's OnTick can close panels, so walk a copy.
+    std::vector<void*> frames;
+    for (auto& item : MenuSystem::instances)
+        frames.push_back(item.first);
+    for (void* frame : frames) {
+        auto found = MenuSystem::instances.find(frame);
+        if (found != MenuSystem::instances.end() && found->second.opened)
+            found->second.panel->OnTick();
+    }
 }
 
-bool Register(const PanelDesc& desc)
+bool SystemImpl::Register(const PanelDesc& desc)
 {
     const char* resource = desc.resource ? desc.resource : desc.id;
     if (!MenuSystem::loaded || !ValidName(desc.id, 63) || !ValidName(resource, MaxResourceLength) || !desc.factory)
         return false;
-    return MenuSystem::registrations.emplace(desc.id, Registration { resource, desc.title ? desc.title : "", desc.factory, desc.footer, desc.layer }).second;
+    return MenuSystem::registrations.emplace(desc.id, Registration { resource, desc.title ? desc.title : "", desc.factory, desc.footer, desc.layer, desc.footerPrimary ? desc.footerPrimary : "" }).second;
 }
 
-bool Unregister(const char* id)
+bool SystemImpl::Unregister(const char* id)
 {
     return id && MenuSystem::registrations.erase(id) != 0;
 }
 
-bool Open(const char* id)
+bool SystemImpl::Open(const char* id)
 {
     void* manager = MenuSystem::loaded ? MenuSystem::Manager() : nullptr;
     return manager && id && MenuSystem::OpenPanel(id, MenuSystem::ActiveWindow(manager));
 }
 
-bool OpenNative(int windowType)
+bool SystemImpl::OpenNative(int windowType)
 {
     void* manager = MenuSystem::loaded ? MenuSystem::Manager() : nullptr;
     return manager && MenuSystem::OpenNativeWindow(windowType, MenuSystem::ActiveWindow(manager));
 }
 
-bool Back()
+bool SystemImpl::Back()
 {
     void* manager = MenuSystem::loaded ? MenuSystem::Manager() : nullptr;
     void* active = manager ? MenuSystem::ActiveWindow(manager) : nullptr;
@@ -457,32 +1068,39 @@ bool Back()
     return true;
 }
 
-void Dump()
+void SystemImpl::Dump()
 {
     void* manager = MenuSystem::loaded ? MenuSystem::Manager() : nullptr;
     if (!manager) {
-        console->Print("menus: unavailable\n");
+        Support::Print("menus: unavailable\n");
         return;
     }
 
-    console->Print("menus: active window %p, closing all %d\n", MenuSystem::ActiveWindow(manager), Field<bool>(manager, layout.closingAllWindows));
+    Support::Print("menus: active window %p, closing all %d\n", MenuSystem::ActiveWindow(manager), Field<bool>(manager, layout.closingAllWindows));
+    Support::Print("  list items %d, mouse-patched classes %d\n", static_cast<int>(listItems.size()), static_cast<int>(mouseVtables.size()));
     for (int priority = 0; priority < WindowPriorityCount; ++priority) {
         const int windowType = Field<int>(manager, layout.activeWindows + priority * sizeof(int));
         if (windowType)
-            console->Print("  active[%d] = type %d\n", priority, windowType);
+            Support::Print("  active[%d] = type %d\n", priority, windowType);
     }
     for (int windowType = 0; windowType < WindowTypeCount; ++windowType) {
         void* frame = MenuSystem::GetWindow(manager, windowType);
         if (frame)
-            console->Print("  slot %2d: %p%s\n", windowType, frame, MenuSystem::instances.count(frame) ? " (custom)" : "");
+            Support::Print("  slot %2d: %p%s\n", windowType, frame, MenuSystem::instances.count(frame) ? " (custom)" : "");
     }
     const char* names[] = { "pages", "popups" };
     for (int layer = 0; layer < 2; ++layer) {
-        console->Print("  %s:", names[layer]);
+        Support::Print("  %s:", names[layer]);
         for (void* frame : MenuSystem::stacks[layer])
-            console->Print(" %p", frame);
-        console->Print("\n");
+            Support::Print(" %p", frame);
+        Support::Print("\n");
     }
 }
 
+
+}
+
+MENUS_EXPORT Menus::System* CreateMenuSystem(const char* version)
+{
+    return version && !std::strcmp(version, Menus::InterfaceVersion) ? &Menus::menuSystem : nullptr;
 }
