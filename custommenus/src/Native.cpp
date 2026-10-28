@@ -23,6 +23,7 @@ constexpr const char* ReleaseActiveMenuControlSignature = "55 8B EC 8B 0D ? ? ? 
 // The GenericPanelList constructor's prologue matches another class's, so find it by its field setup.
 constexpr const char* ListConstructorSignature = "8B 45 10 89 9E 60 01 00 00 89 9E 64 01 00 00 89 9E 68 01 00 00 89 9E 6C 01 00 00 89 9E 70 01 00 00 33 C9 66 89 8E 14 02 00 00";
 constexpr int ListConstructorSignatureOffset = -0x102;
+constexpr const char* HybridButtonSetCurrentSelectionSignature = "55 8B EC 53 56 8B F1 8B 86 40 02 00 00 57 83 F8 02 0F 85";
 constexpr const char* GetUIGameDataSignature = "A1 ? ? ? ? 85 C0 75 2D 38 05 ? ? ? ? 75 25 68 50 01 00 00 E8";
 constexpr const char* AccessAvatarImageSignature = "55 8B EC 83 EC 14 83 7D 10 00 56 8B F1 75 09 33 C0 5E 8B E5 5D C2 10 00 8B 45 0C 53 8B 5D 08 8B CB 0B C8 75 0A";
 // CGameUiAvatarImage::SetAvatarXUID, which starts by loading the client's CSteamAPIContext pointer.
@@ -102,6 +103,7 @@ bool Resolve(const char* clientModule)
         && Find(clientModule, SetDialogTitleSignature, functions.setDialogTitle)
         && Find(clientModule, ListConstructorSignature, functions.listConstructor, ListConstructorSignatureOffset)
         && Find(clientModule, FindChildByNameSignature, functions.findChildByName)
+        && Find(clientModule, HybridButtonSetCurrentSelectionSignature, functions.hybridButtonSetCurrentSelection)
         && Find(clientModule, UtlStringSetSignature, functions.utlStringSet)
         && Find(clientModule, GetUIGameDataSignature, functions.getUIGameData)
         && Find(clientModule, AccessAvatarImageSignature, functions.accessAvatarImage)

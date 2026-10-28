@@ -116,6 +116,8 @@ struct Functions {
     using LoadControlSettings = void(MENUS_THISCALL*)(void* panel, const char* resource, const char* pathId, void* keyValues, void* conditions);
     using CreateControlByName = void*(MENUS_THISCALL*)(void* panel, const char* controlName);
     using LabelSetText = void(MENUS_THISCALL*)(void* label, const char* text);
+    // Selects a DialogListButton style button's entry by its display text.
+    using HybridButtonSetCurrentSelection = void(MENUS_THISCALL*)(void* button, const char* text);
     using ListConstructor = void(MENUS_THISCALL*)(void* list, void* parent, const char* name, int selectionModifier, bool mostDerived);
     using ListAddItem = int(MENUS_THISCALL*)(void* list, void* item, bool needsInvalidateScheme);
     using ListSelectItem = bool(MENUS_THISCALL*)(void* list, unsigned short index, int direction, bool scrollToItem, bool allowStealFocus, bool skipDisabled);
@@ -129,6 +131,7 @@ struct Functions {
     SetDialogTitle setDialogTitle = nullptr;
     ListConstructor listConstructor = nullptr;
     FindChildByName findChildByName = nullptr;
+    HybridButtonSetCurrentSelection hybridButtonSetCurrentSelection = nullptr;
     UtlStringSet utlStringSet = nullptr;
     GetUIGameData getUIGameData = nullptr;
     AccessAvatarImage accessAvatarImage = nullptr;

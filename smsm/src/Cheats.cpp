@@ -18,7 +18,10 @@ Variable sv_player_collide_with_laser;
 Variable sv_cheats;
 Variable crosshair;
 Variable viewmodel_offset_z;
-Variable puzzlemaker_play_sounds;
+
+// Options > Speedrun Mod
+Variable sm_dialogue("sm_dialogue", "1", "Plays in-game dialogue.\n", FCVAR_ARCHIVE);
+Variable sm_fast_start("sm_fast_start", "0", "Skips the slow wakeup at the start of the game.\n", FCVAR_ARCHIVE);
 
 void Cheats::Init()
 {
@@ -45,7 +48,6 @@ void Cheats::Init()
     sv_cheats = Variable("sv_cheats");
     crosshair = Variable("crosshair");
     viewmodel_offset_z = Variable("viewmodel_offset_z");
-    puzzlemaker_play_sounds = Variable("puzzlemaker_play_sounds");
 
 
     Variable::RegisterAll();
