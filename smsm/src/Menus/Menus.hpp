@@ -53,6 +53,8 @@ struct PanelDesc {
     const char* id = nullptr;
     // Resource/UI/BaseModUI/<resource>.res. Defaults to the id.
     const char* resource = nullptr;
+    // The dialog's title tab, like stock panels set in code. A localization token or plain text.
+    const char* title = nullptr;
     PanelFactory factory = nullptr;
     bool footer = true;
     Layer layer = Layer::Page;

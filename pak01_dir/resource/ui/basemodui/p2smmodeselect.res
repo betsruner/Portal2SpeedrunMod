@@ -14,23 +14,6 @@
 		"dialogstyle"			"1"
 	}
 
-	"LblHeading"
-	{
-		"ControlName"			"Label"
-		"fieldName"				"LblHeading"
-		"xpos"					"0"
-		"ypos"					"0"
-		"wide"					"0"
-		"tall"					"20"
-		"visible"				"1"
-		"enabled"				"1"
-		"tabPosition"			"0"
-		"labelText"				"SPEEDRUN MOD"
-		"textAlignment"			"west"
-		"Font"					"FriendsListStatusLine"
-		"fgcolor_override"		"0 0 0 255"
-	}
-
 	"BtnFullGame"
 	{
 		"ControlName"			"BaseModHybridButton"

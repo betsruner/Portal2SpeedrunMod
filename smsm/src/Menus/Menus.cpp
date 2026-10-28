@@ -27,6 +27,7 @@ constexpr const char* BackCommand = "menus_back";
 
 struct Registration {
     std::string resource;
+    std::string title;
     PanelFactory factory;
     bool footer;
     Layer layer;
@@ -135,6 +136,8 @@ public:
         Virtual<Functions::FrameBool>(frame, layout.setAutoDelete)(frame, true);
         Virtual<Functions::FrameBool>(frame, layout.setProportional)(frame, true);
         functions.setDeleteSelfOnClose(frame, true);
+        if (!registration.title.empty())
+            functions.setDialogTitle(frame, registration.title.c_str(), nullptr, 0, 0, 0, 0);
 
         const int slot = SlotFor(registration.layer);
         Field<int>(frame, layout.frameWindowPriority) = CustomWindowPriority;
@@ -424,7 +427,7 @@ bool Register(const PanelDesc& desc)
     const char* resource = desc.resource ? desc.resource : desc.id;
     if (!MenuSystem::loaded || !ValidName(desc.id, 63) || !ValidName(resource, MaxResourceLength) || !desc.factory)
         return false;
-    return MenuSystem::registrations.emplace(desc.id, Registration { resource, desc.factory, desc.footer, desc.layer }).second;
+    return MenuSystem::registrations.emplace(desc.id, Registration { resource, desc.title ? desc.title : "", desc.factory, desc.footer, desc.layer }).second;
 }
 
 bool Unregister(const char* id)

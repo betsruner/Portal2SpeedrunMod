@@ -43,6 +43,8 @@ struct Functions {
     using GetPanelSingleton = void*(__cdecl*)();
     using Allocate = void*(__cdecl*)(size_t);
     using FrameConstructor = void(__func*)(void* frame, void* parent, const char* name, bool okButton, bool cancelButton, bool splatter, bool doButton, bool mostDerived);
+    // Localization token (or plain text if it isn't one), or a wide string when the token is null.
+    using SetDialogTitle = void(__func*)(void* frame, const char* token, const wchar_t* text, int, int, int, int);
     using OpenWindow = void*(__func*)(void* manager, int* windowType, void* caller, bool hidePrevious, void* parameters);
     using HandleGet = void*(__func*)(void* handle);
     using HandleSet = void(__func*)(void* handle, void* panel);
@@ -56,6 +58,7 @@ struct Functions {
     GetPanelSingleton getPanelSingleton = nullptr;
     Allocate allocate = nullptr;
     FrameConstructor frameConstructor = nullptr;
+    SetDialogTitle setDialogTitle = nullptr;
     OpenWindow openWindow = nullptr;
     HandleGet handleGet = nullptr;
     HandleSet handleSet = nullptr;
