@@ -54,6 +54,8 @@ constexpr Layout PlatformLayout {
     183, 189, 184, 184,
     // GenericPanelList
     548, 504, 183, 187, 188, 195, 196,
+    // Added later: ImagePanel::SetImage(const char*), IPanel::SetPos / SetSize, Panel::OnMouseDoublePressed
+    183, 2, 4, 78,
 };
 #else
 // Linux values carried over from the first prototype. The vtable indices are the Windows ones
@@ -80,6 +82,7 @@ constexpr Layout PlatformLayout {
     -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1,
 };
 #endif
 
