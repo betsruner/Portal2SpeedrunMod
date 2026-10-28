@@ -76,6 +76,10 @@ struct Layout {
     int listSelectItem;
     int listSetScrollBarVisible;
     int listSetScrollArrowsVisible;
+    int imagePanelSetImageName; // SetImage(const char*), relative to materials/vgui/
+    int panelSetPos;            // vgui::IPanel
+    int panelSetSize;           // vgui::IPanel
+    int onMouseDoublePressed;   // vgui::Panel; the second press of a double-click comes here instead of OnMousePressed
 };
 
 struct Functions {
@@ -97,6 +101,8 @@ struct Functions {
     using GetVPanel = uintptr_t(MENUS_THISCALL*)(void* clientPanel);
     using PanelGetInts = void(MENUS_THISCALL*)(void* panelInterface, uintptr_t vpanel, int& a, int& b);
     using PanelSetParent = void(MENUS_THISCALL*)(void* panelInterface, uintptr_t vpanel, uintptr_t parent);
+    using PanelSetInts = void(MENUS_THISCALL*)(void* panelInterface, uintptr_t vpanel, int a, int b);
+    using ImagePanelSetImageName = void(MENUS_THISCALL*)(void* imagePanel, const char* image);
     using SurfaceDrawSetColor = void(MENUS_THISCALL*)(void* surface, int r, int g, int b, int a);
     using SurfaceDrawFilledRect = void(MENUS_THISCALL*)(void* surface, int x0, int y0, int x1, int y1);
     using SurfaceGetFontTall = int(MENUS_THISCALL*)(void* surface, unsigned long font);

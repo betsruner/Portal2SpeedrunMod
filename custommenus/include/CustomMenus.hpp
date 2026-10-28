@@ -21,7 +21,7 @@
 namespace Menus {
 
 // Bumped whenever anything in this header changes in a way that breaks plugins built against it.
-constexpr const char* InterfaceVersion = "CustomMenus001";
+constexpr const char* InterfaceVersion = "CustomMenus002";
 
 struct Color {
     unsigned char r, g, b, a;
@@ -52,6 +52,34 @@ protected:
     ~List() = default;
 };
 
+// A scrolling grid of tiles, created with Panel::CreateGrid: a BaseModUI::GenericPanelList whose
+// rows each hold up to `columns` tiles, laid out left to right at the tile's .res width (so the
+// tile's width includes its spacing). Its .res entry (matched by name) sets its position and look.
+// Clicking a tile selects it and double-clicking activates it (Panel::OnItemActivated); Up and Down
+// move between rows and Left and Right within one. Owned by the panel that created it.
+class Grid {
+public:
+    virtual void Clear() = 0;
+    // Adds a tile built from Resource/UI/BaseModUI/<resource>.res, whose root block must be named
+    // <resource>. Returns its index, or -1.
+    virtual int Add(const char* resource) = 0;
+    virtual int Count() = 0;
+    // Sets the text of a Label or button named control inside the tile.
+    virtual bool SetItemText(int index, const char* control, const char* text) = 0;
+    // Shows a material in an ImagePanel named control inside the tile. Like an ImagePanel's "image"
+    // .res key, the name is relative to materials/vgui/.
+    virtual bool SetItemImage(int index, const char* control, const char* image) = 0;
+    // Runtime colors don't survive the tile's scheme being reapplied, so set them every OnTick.
+    virtual bool SetItemBackground(int index, Color color) = 0;
+    virtual bool SetItemTextColor(int index, const char* control, Color color) = 0;
+    // The selected tile's index, or -1.
+    virtual int Selected() = 0;
+    virtual void Select(int index) = 0;
+
+protected:
+    ~Grid() = default;
+};
+
 // A horizontal option picker drawn like the stock leaderboard's "PORTALS / TIME" toggle, but for
 // any number of options: arrows either side and every option in a row, the selected one bright.
 // Clicking an option selects it; clicking an arrow steps (wrapping around). Created with
@@ -79,6 +107,7 @@ public:
     virtual List* CreateList(const char* name) = 0;
     virtual Selector* CreateSelector(const char* name, const char* font) = 0;
     virtual bool SetListSelection(const char* control, const char* item) = 0;
+    virtual Grid* CreateGrid(const char* name, int columns) = 0;
 
 protected:
     ~Frame() = default;
@@ -99,6 +128,8 @@ public:
     virtual bool OnCommand(const char* command) { return false; }
     // vgui ButtonCode_t, including the footer's controller buttons. Return true if handled.
     virtual bool OnKeyCodePressed(int code) { return false; }
+    // An item of the Grid named control was double-clicked.
+    virtual void OnItemActivated(const char* control, int index) {}
     // Once per frame while the panel is open.
     virtual void OnTick() {}
     virtual void OnClose() {}
@@ -124,6 +155,8 @@ public:
 protected:
     // Only valid inside OnCreate.
     List* CreateList(const char* name) { return this->frame ? this->frame->CreateList(name) : nullptr; }
+    // Only valid inside OnCreate.
+    Grid* CreateGrid(const char* name, int columns) { return this->frame ? this->frame->CreateGrid(name, columns) : nullptr; }
     // Only valid inside OnCreate. font is a font from the BaseModUI scheme.
     Selector* CreateSelector(const char* name, const char* font = "NewGameChapterName")
     {

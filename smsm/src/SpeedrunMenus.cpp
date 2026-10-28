@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 #include <vector>
 
 #include "Cheats.hpp"
@@ -252,6 +253,81 @@ private:
     int filledMap = -1;
 };
 
+// Full Game: a grid of the playable categories. Credits, the leaderboard link and the like live
+// in the stock Extras panel (scripts/extras.txt) instead.
+struct FullGameCategory {
+    const char* name;
+    const char* image; // relative to materials/vgui/
+    int mode; // sm_mode
+    const char* map;
+};
+
+const FullGameCategory FullGameCategories[] = {
+    { "Normal", "../srmod/menu_modes/normal", 0, "sp_a1_intro1" },
+    { "Celeste Mode", "../srmod/menu_modes/celeste", 2, "sp_a1_intro1" },
+    { "Reverse Mod", "../srmod/menu_modes/reverse", 4, "sp_a4_finale4" },
+    { "Floor is Lava", "../srmod/menu_modes/floorislava", 5, "sp_a1_intro1" },
+    { "Odyssey Mod", "../srmod/menu_modes/smo", 6, "sp_a1_intro1" },
+    { "Fog% (beta)", "../srmod/menu_modes/fog", 1, "sp_a1_intro1" },
+};
+
+class FullGamePanel : public Menus::Panel {
+public:
+    void OnCreate() override
+    {
+        this->grid = this->CreateGrid("CategoryGrid", 3);
+    }
+
+    void OnOpen() override
+    {
+        if (!this->grid)
+            return;
+        for (const FullGameCategory& category : FullGameCategories) {
+            const int tile = this->grid->Add("P2SMCategoryTile");
+            this->grid->SetItemText(tile, "LblCategory", category.name);
+            this->grid->SetItemImage(tile, "ImgCategory", category.image);
+        }
+        this->grid->Select(0);
+    }
+
+    bool OnKeyCodePressed(int code) override
+    {
+        if (code != KeyXButtonA && code != KeyXButtonA2)
+            return false;
+        if (this->grid)
+            this->Start(this->grid->Selected());
+        return true;
+    }
+
+    void OnItemActivated(const char* control, int index) override
+    {
+        this->Start(index);
+    }
+
+    void OnTick() override
+    {
+        if (!this->grid)
+            return;
+        const int selected = this->grid->Selected();
+        for (int i = 0; i < this->grid->Count(); ++i) {
+            this->grid->SetItemBackground(i, i == selected ? SelectedRowColor : RowColor);
+            this->grid->SetItemTextColor(i, "LblCategory", i == selected ? SelectedTextColor : TextColor);
+        }
+    }
+
+private:
+    void Start(int index)
+    {
+        if (index < 0 || index >= static_cast<int>(std::size(FullGameCategories)))
+            return;
+        char command[64];
+        std::snprintf(command, sizeof(command), "sm_mode %d;map %s\n", FullGameCategories[index].mode, FullGameCategories[index].map);
+        engine->Cbuf_AddText(0, command, 0);
+    }
+
+    Menus::Grid* grid = nullptr;
+};
+
 // Options > Speedrun Mod rows: stock on/off list buttons, each backed by an archived cvar.
 // Must match the "list" blocks in P2SMSettings.res.
 struct SettingToggle {
@@ -309,7 +385,8 @@ void RegisterSpeedrunMenus(Menus::System* menus)
 {
     // Main menu "Speedrun Mod" button -> pick Full Game or Challenge Mode.
     menus->Register({ "p2sm_mode_select", "P2SMModeSelect", "Speedrun Mod", PLACEHOLDER("p2sm_mode_select") });
-    menus->Register({ "p2sm_full_game", "P2SMFullGame", "Full Game", PLACEHOLDER("p2sm_full_game") });
+    menus->Register({ "p2sm_full_game", "P2SMFullGame", "Full Game",
+        +[]() -> Menus::Panel* { return new FullGamePanel(); }, true, Menus::Layer::Page, "#L4D360UI_Start" });
     // The stock leaderboard's strings live in portal2_dlc1, which the mod doesn't search, so use plain text.
     menus->Register({ "p2sm_challenge_mode", "P2SMChallengeMode", "Leaderboards",
         +[]() -> Menus::Panel* { return new ChallengeModePanel(); }, true, Menus::Layer::Page, "#PORTAL2_PlaySelectedMap" });

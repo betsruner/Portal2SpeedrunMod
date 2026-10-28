@@ -59,13 +59,39 @@
 		"enabled"					"1"
 		"tabPosition"				"0"
 		"navUp"						"BtnExtras"
-		"navDown"					"BtnOptions"
+		"navDown"					"BtnModExtras"
 		"labelText"					"Speedrun Mod Coop"
 		"style"						"MainMenuButton"
 		"command"					"CoopPlay"
 		"ActivationType"			"1"
 	}
-	
+
+	// The stock Extras panel, filled from scripts/extras.txt.
+	"BtnModExtras"
+	{
+		"ControlName"				"BaseModHybridButton"
+		"fieldName"					"BtnModExtras"
+		"xpos"						"88"	[$GAMECONSOLE && ($GAMECONSOLEWIDE && !$ANAMORPHIC)]
+		"xpos"						"63"	[$GAMECONSOLE && (!$GAMECONSOLEWIDE || $ANAMORPHIC)]
+		"xpos"						"88"	[!$GAMECONSOLE && $WIN32WIDE]
+		"xpos"						"63"	[!$GAMECONSOLE && !$WIN32WIDE]
+		"ypos"						"340"	[$GAMECONSOLE]
+		"ypos"						"318"	[!$GAMECONSOLE]
+		"wide"						"280"
+		"tall"						"20"
+		"autoResize"				"1"
+		"pinCorner"					"0"
+		"visible"					"1"
+		"enabled"					"1"
+		"tabPosition"				"0"
+		"navUp"						"BtnCoOp"
+		"navDown"					"BtnOptions"
+		"labelText"					"#L4D360UI_MainMenu_Extras"
+		"style"						"MainMenuButton"
+		"command"					"Extras"
+		"ActivationType"			"1"
+	}
+
 	"BtnOptions"
 	{
 		"ControlName"				"BaseModHybridButton"
@@ -74,8 +100,8 @@
 		"xpos"						"63"	[$GAMECONSOLE && (!$GAMECONSOLEWIDE || $ANAMORPHIC)]	
 		"xpos"						"88"	[!$GAMECONSOLE && $WIN32WIDE]
 		"xpos"						"63"	[!$GAMECONSOLE && !$WIN32WIDE]	
-		"ypos"						"340"	[$GAMECONSOLE]  
-		"ypos"						"318"	[!$GAMECONSOLE] 
+		"ypos"						"370"	[$GAMECONSOLE]
+		"ypos"						"348"	[!$GAMECONSOLE]
 		"wide"						"280"
 		"tall"						"20"
 		"autoResize"				"1"
@@ -83,7 +109,7 @@
 		"visible"					"1"
 		"enabled"					"1"
 		"tabPosition"				"0"
-		"navUp"						"BtnExtras"
+		"navUp"						"BtnModExtras"
 		"navDown"					"BtnQuit"
 		"labelText"					"#PORTAL2_MainMenu_Options"
 		"style"						"MainMenuButton"
@@ -97,7 +123,7 @@
 		"fieldName"					"BtnQuit"
 		"xpos"						"88"	[$WIN32WIDE]
 		"xpos"						"63"	[!$WIN32WIDE]	
-		"ypos"						"348"
+		"ypos"						"378"
 		"wide"						"280"
 		"tall"						"20"
 		"autoResize"				"1"
