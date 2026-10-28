@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
+#include "Cheats.hpp"
 #include "Leaderboards.hpp"
 #include "Modules/Console.hpp"
 #include "Modules/Engine.hpp"
@@ -250,6 +252,40 @@ private:
     int filledMap = -1;
 };
 
+// Options > Speedrun Mod rows: stock on/off list buttons, each backed by an archived cvar.
+// Must match the "list" blocks in P2SMSettings.res.
+struct SettingToggle {
+    const char* control;
+    Variable* variable;
+    const char* enableCommand;
+    const char* disableCommand;
+};
+
+const SettingToggle SettingToggles[] = {
+    { "DrpDialogue", &sm_dialogue, "DialogueEnabled", "DialogueDisabled" },
+    { "DrpFastStart", &sm_fast_start, "FastStartEnabled", "FastStartDisabled" },
+};
+
+class SettingsPanel : public Menus::Panel {
+public:
+    void OnActivate() override
+    {
+        for (const SettingToggle& toggle : SettingToggles)
+            this->SetListSelection(toggle.control, toggle.variable->GetBool() ? "#L4D360UI_Enabled" : "#L4D360UI_Disabled");
+    }
+
+    bool OnCommand(const char* command) override
+    {
+        for (const SettingToggle& toggle : SettingToggles) {
+            if (!std::strcmp(command, toggle.enableCommand) || !std::strcmp(command, toggle.disableCommand)) {
+                toggle.variable->SetValue(!std::strcmp(command, toggle.enableCommand) ? 1 : 0);
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
 // Placeholder until the real panels exist: logs its lifecycle so menu navigation can be traced in the console.
 class PlaceholderPanel : public Menus::Panel {
 public:
@@ -278,7 +314,7 @@ void RegisterSpeedrunMenus(Menus::System* menus)
     menus->Register({ "p2sm_challenge_mode", "P2SMChallengeMode", "Leaderboards",
         +[]() -> Menus::Panel* { return new ChallengeModePanel(); }, true, Menus::Layer::Page, "#PORTAL2_PlaySelectedMap" });
     // Options -> Speedrun Mod settings.
-    menus->Register({ "p2sm_settings", "P2SMSettings", "Speedrun Mod", PLACEHOLDER("p2sm_settings") });
+    menus->Register({ "p2sm_settings", "P2SMSettings", "Speedrun Mod", +[]() -> Menus::Panel* { return new SettingsPanel(); } });
 
     // Navigation tests: a third level of pages and a popup.
     menus->Register({ "p2sm_test_page", "P2SMTestPage", "Third Page", PLACEHOLDER("p2sm_test_page") });

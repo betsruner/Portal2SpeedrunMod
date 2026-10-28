@@ -78,6 +78,7 @@ public:
     virtual bool SetControlText(const char* control, const char* text) = 0;
     virtual List* CreateList(const char* name) = 0;
     virtual Selector* CreateSelector(const char* name, const char* font) = 0;
+    virtual bool SetListSelection(const char* control, const char* item) = 0;
 
 protected:
     ~Frame() = default;
@@ -90,7 +91,7 @@ public:
 
     // The native frame exists but its .res hasn't loaded yet. Create lists here.
     virtual void OnCreate() {}
-    // The first time the panel is shown.
+    // The first time the panel is shown. Its .res has loaded by now, so its controls exist.
     virtual void OnOpen() {}
     // Every time the panel becomes the active window, including after Back from a child panel.
     virtual void OnActivate() {}
@@ -114,6 +115,11 @@ public:
     }
     // Sets the text of a Label or button named control anywhere in the panel.
     bool SetControlText(const char* control, const char* text) { return this->frame && this->frame->SetControlText(control, text); }
+    // Shows item as the value of a BaseModHybridButton with "style" "DialogListButton" named
+    // control. item is the entry's display text in the button's .res "list" block (for example
+    // "#L4D360UI_Enabled"). Picking an entry sends its command to OnCommand. The panel's .res has
+    // to be loaded, so call it from OnOpen or OnActivate.
+    bool SetListSelection(const char* control, const char* item) { return this->frame && this->frame->SetListSelection(control, item); }
 
 protected:
     // Only valid inside OnCreate.

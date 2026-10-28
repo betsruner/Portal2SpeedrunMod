@@ -94,6 +94,21 @@ void ReleasePendingAvatars()
     }
 }
 
+constexpr const char* HybridButtonClassName = ".?AVBaseModHybridButton@BaseModUI@@";
+
+// The class name MSVC's RTTI records for a polymorphic object, like HybridButtonClassName.
+const char* ClassName(void* object)
+{
+#ifdef _WIN32
+    // The vtable is preceded by the RTTI complete object locator, whose fourth field points to
+    // the type descriptor; the decorated name starts 8 bytes into it.
+    auto locator = reinterpret_cast<const uint32_t*>((*static_cast<uintptr_t**>(object))[-1]);
+    return reinterpret_cast<const char*>(locator[3]) + 8;
+#else
+    return "";
+#endif
+}
+
 // vgui::Color is four bytes passed by value.
 int NativeColor(Color color)
 {
@@ -503,6 +518,7 @@ public:
     bool SetControlText(const char* control, const char* text) override;
     List* CreateList(const char* name) override;
     Selector* CreateSelector(const char* name, const char* font) override;
+    bool SetListSelection(const char* control, const char* item) override;
 
 private:
     void* frame;
@@ -516,6 +532,10 @@ struct Instance {
     // vgui::PHandle, so frames the game deletes without closing them can be noticed.
     int handle;
     bool opened;
+    // The frame loads its .res when its scheme is first applied, which can come after it opens;
+    // panels are only told they're open once their controls exist.
+    bool schemeApplied;
+    bool activationPending;
     std::vector<ListImpl*> lists;
     std::vector<SelectorImpl*> selectors;
 };
@@ -634,7 +654,7 @@ public:
 
         auto access = new FrameImpl(frame);
         panel->frame = access;
-        Instance& instance = instances.emplace(frame, Instance { panel, hooks, access, registration.layer, -1, false, {} }).first->second;
+        Instance& instance = instances.emplace(frame, Instance { panel, hooks, access, registration.layer, -1, false, false, false, {}, {} }).first->second;
         functions.handleSet(&instance.handle, frame);
         panel->OnCreate();
         StackFor(registration.layer).push_back(frame);
@@ -658,6 +678,19 @@ public:
         if (!manager || windowType <= 0 || windowType >= WindowTypeCount || windowType == PageSlot || windowType == PopupSlot)
             return false;
         return functions.openWindow(manager, &windowType, caller, true, nullptr) != nullptr;
+    }
+
+    // Tells the panel it's the active window (and that it's open, the first time).
+    static void Activate(void* frame)
+    {
+        auto found = instances.find(frame);
+        if (found != instances.end() && !found->second.opened) {
+            found->second.opened = true;
+            found->second.panel->OnOpen();
+            found = instances.find(frame); // OnOpen may have closed it
+        }
+        if (found != instances.end())
+            found->second.panel->OnActivate();
     }
 
     static void NavigateBack(void* frame)
@@ -818,6 +851,13 @@ MENUS_DETOUR(void, MenuSystem::ApplySchemeSettings, void* scheme)
             list->ApplyScheme();
         for (SelectorImpl* selector : found->second.selectors)
             selector->ApplyScheme(scheme);
+        if (!found->second.schemeApplied) {
+            found->second.schemeApplied = true;
+            if (found->second.activationPending) {
+                found->second.activationPending = false;
+                Activate(thisptr);
+            }
+        }
     }
 }
 
@@ -845,11 +885,10 @@ MENUS_DETOUR(void, MenuSystem::OnOpen)
     auto found = instances.find(thisptr);
     if (found == instances.end())
         return;
-    if (!found->second.opened) {
-        found->second.opened = true;
-        found->second.panel->OnOpen();
-    }
-    found->second.panel->OnActivate();
+    if (found->second.schemeApplied)
+        Activate(thisptr);
+    else
+        found->second.activationPending = true;
 }
 
 MENUS_DETOUR(void, MenuSystem::OnClose)
@@ -917,6 +956,15 @@ void FrameImpl::Close()
 {
     if (this->frame && MenuSystem::loaded)
         MenuSystem::NavigateBack(this->frame);
+}
+
+bool FrameImpl::SetListSelection(const char* control, const char* item)
+{
+    void* button = MenuSystem::loaded && control && item ? functions.findChildByName(this->frame, control, true) : nullptr;
+    if (!button || std::strcmp(ClassName(button), HybridButtonClassName) != 0)
+        return false;
+    functions.hybridButtonSetCurrentSelection(button, item);
+    return true;
 }
 
 bool FrameImpl::SetControlText(const char* control, const char* text)

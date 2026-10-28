@@ -33,7 +33,8 @@ DEFINE_SCRIPTFUNC(GetMode, "Returns current mode.")
 DEFINE_SCRIPTFUNC(SetMode, "Sets the mod mode.")
 DEFINE_SCRIPTFUNC(GetModeParam, "Returns mod-specific param with given ID.")
 DEFINE_SCRIPTFUNC(SetModeParam, "Sets mod specific param if it's not read-only (i.e. not constantly updated).")
-DEFINE_SCRIPTFUNC(IsDialogueEnabled, "Is dialogue enabled in audio settings?")
+DEFINE_SCRIPTFUNC(IsDialogueEnabled, "Is dialogue enabled in Speedrun Mod settings?")
+DEFINE_SCRIPTFUNC(IsFastStartEnabled, "Is fast start enabled in Speedrun Mod settings?")
 DEFINE_SCRIPTFUNC(SetPortalGunIndicatorColor, "Sets the color of portal gun indicator. Set to 0,0,0 to use default.")
 DEFINE_SCRIPTFUNC(SetScreenCoverColor, "Sets color that covers the whole screen.")
 DEFINE_SCRIPTFUNC(PrecacheModel, "Precaches model")
@@ -213,7 +214,11 @@ void SMSM::SetScreenCoverColor(int r, int g, int b, int a) {
 }
 
 bool SMSM::IsDialogueEnabled() {
-    return puzzlemaker_play_sounds.GetBool();
+    return sm_dialogue.GetBool();
+}
+
+bool SMSM::IsFastStartEnabled() {
+    return sm_fast_start.GetBool();
 }
 
 //dialogue mute stuff

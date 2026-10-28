@@ -84,6 +84,7 @@ public:
     void SetPortalGunIndicatorColor(Vector color);
     void SetScreenCoverColor(int r, int g, int b, int a);
     bool IsDialogueEnabled();
+    bool IsFastStartEnabled();
     void DialogueMute_Update();
     void DialogueMute_SetForceState(bool state);
     void RefreshEntity(HSCRIPT hScript);

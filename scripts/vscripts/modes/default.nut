@@ -106,13 +106,13 @@ function SpeedrunModeLoad(){
       fadein.__KeyValueFromInt("renderamt", 255)
       EntFire("@exit_door-testchamber_door", "Open")
 
-      //Fast Start or Slow Start based on dialogue
-      local isDialogueEnabled = smsm.IsDialogueEnabled();
-      if(isDialogueEnabled == true){
+      //Fast Start or Slow Start, set in Options > Speedrun Mod
+      local isFastStartEnabled = smsm.IsFastStartEnabled();
+      if(isFastStartEnabled == false){
         EntFire("@glados", "RunScriptCode", "GladosPlayVcd(\"PreHub01RelaxationVaultIntro01\")", 3)
         EntFire("@glados", "RunScriptCode", "GladosPlayVcd(\"PreHub01RelaxationVaultIntro04\")", 7.2)
       }
-      else if (isDialogueEnabled == false){
+      else if (isFastStartEnabled == true){
         GetPlayer().SetOrigin(Vector(-1190,4456,2724));
         GetPlayer().SetAngles(-4, -115, 0)
         EntFire("@music_awake", "kill")

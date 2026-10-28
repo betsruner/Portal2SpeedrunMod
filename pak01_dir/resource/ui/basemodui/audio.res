@@ -280,35 +280,9 @@
 		"tabPosition"			"0"
 		"wrap"					"1"
 		"navUp"					"DrpVoicePTT"
-		"navDown"				"DrpPuzzlemakerSounds"
+		"navDown"				"SldGameVolume"
 		"labelText"				"#PORTAL2_SetupMicrophone"
 		"style"					"DefaultButton"
 		"command"				"BtnSetupMicrophone"
-	}
-
-	"DrpPuzzlemakerSounds"
-	{
-		"ControlName"		"BaseModHybridButton"
-		"fieldName"			"DrpPuzzleMakerSounds"
-		"xpos"				"0"
-		"ypos"				"200"
-		"?localizedaudio"
-		{
-			"ypos"				"225"
-		}
-		"wide"				"0"
-		"tall"				"20"
-		"visible"			"1"
-		"enabled"			"1"
-		"tabPosition"		"0"
-		"navUp"				"BtnSetupMicrophone"
-		"navDown"			"SldGameVolume"
-		"labelText"			"#PORTAL2_PuzzleMaker_Puzzlemaker_sounds"
-		"style"				"DialogListButton"
-		"list"
-		{
-			"#L4D360UI_Disabled"	"PuzzlemakerSoundsDisabled"
-			"#L4D360UI_Enabled"		"PuzzlemakerSoundsEnabled"
-		}
 	}
 }
