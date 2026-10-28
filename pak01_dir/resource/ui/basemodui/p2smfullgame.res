@@ -1,0 +1,87 @@
+"Resource/UI/BaseModUI/P2SMFullGame.res"
+{
+	"P2SMFullGame"
+	{
+		"ControlName"			"Frame"
+		"fieldName"				"P2SMFullGame"
+		"xpos"					"0"
+		"ypos"					"0"
+		"wide"					"6"
+		"tall"					"4"
+		"visible"				"1"
+		"enabled"				"1"
+		"tabPosition"			"0"
+		"dialogstyle"			"1"
+	}
+
+	"LblHeading"
+	{
+		"ControlName"			"Label"
+		"fieldName"				"LblHeading"
+		"xpos"					"0"
+		"ypos"					"0"
+		"wide"					"0"
+		"tall"					"20"
+		"visible"				"1"
+		"enabled"				"1"
+		"tabPosition"			"0"
+		"labelText"				"FULL GAME (placeholder)"
+		"textAlignment"			"west"
+		"Font"					"FriendsListStatusLine"
+		"fgcolor_override"		"0 0 0 255"
+	}
+
+	"BtnModes"
+	{
+		"ControlName"			"BaseModHybridButton"
+		"fieldName"				"BtnModes"
+		"command"				"menus_open_native 63"
+		"xpos"					"0"
+		"ypos"					"25"
+		"wide"					"0"
+		"tall"					"20"
+		"visible"				"1"
+		"enabled"				"1"
+		"tabPosition"			"1"
+		"navUp"					"BtnTestPopup"
+		"navDown"				"BtnTestPage"
+		"labelText"				"Mode list (stock Extras panel)"
+		"style"					"DefaultButton"
+	}
+
+	"BtnTestPage"
+	{
+		"ControlName"			"BaseModHybridButton"
+		"fieldName"				"BtnTestPage"
+		"command"				"menus_open p2sm_test_page"
+		"xpos"					"0"
+		"ypos"					"50"
+		"wide"					"0"
+		"tall"					"20"
+		"visible"				"1"
+		"enabled"				"1"
+		"tabPosition"			"0"
+		"navUp"					"BtnModes"
+		"navDown"				"BtnTestPopup"
+		"labelText"				"Open a third page"
+		"style"					"DefaultButton"
+	}
+
+	"BtnTestPopup"
+	{
+		"ControlName"			"BaseModHybridButton"
+		"fieldName"				"BtnTestPopup"
+		"command"				"menus_open p2sm_test_popup"
+		"xpos"					"0"
+		"ypos"					"75"
+		"wide"					"0"
+		"tall"					"20"
+		"visible"				"1"
+		"enabled"				"1"
+		"tabPosition"			"0"
+		"navUp"					"BtnTestPage"
+		"navDown"				"BtnModes"
+		"labelText"				"Open a popup"
+		"style"					"DefaultButton"
+	}
+}

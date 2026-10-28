@@ -1,6 +1,5 @@
 #include "VGui.hpp"
 
-#include "BaseModUI.hpp"
 #include "Client.hpp"
 #include "Console.hpp"
 #include "Engine.hpp"
@@ -13,14 +12,14 @@
 #include "Offsets.hpp"
 #include "Utils.hpp"
 #include "CelesteMoveset.hpp"
+#include "Menus/Menus.hpp"
 
 REDECL(VGui::Paint);
 
 // CEngineVGui::Paint
 DETOUR(VGui::Paint, int mode)
 {
-    if (basemodui)
-        basemodui->EnsureMainMenuHook();
+    Menus::Tick();
 
     // drawing custom gui only once per frame
     // flag is set by RenderView detour in client

@@ -19,6 +19,8 @@ public:
     void CopyVtable();
     void EnableHooks();
     void DisableHooks();
+    // The hooked object was freed, so don't write its original vtable back on delete.
+    void Forget() { this->isHooked = false; }
 
     template <typename T = uintptr_t>
     T Original(int index, bool readJmp = false)
