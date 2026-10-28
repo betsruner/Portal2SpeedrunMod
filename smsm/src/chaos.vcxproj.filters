@@ -17,6 +17,9 @@
     <Filter Include="Source\Hud">
       <UniqueIdentifier>{39f217ea-7cf1-43cf-ae92-699502c6bddb}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Menus">
+      <UniqueIdentifier>{6d2f1b0e-8a43-4c3e-9f57-2b1e7c9d4a61}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Cheats.cpp">
@@ -85,8 +88,14 @@
     <ClCompile Include="Modules\VGui.cpp">
       <Filter>Source\Modules</Filter>
     </ClCompile>
-    <ClCompile Include="Modules\BaseModUI.cpp">
-      <Filter>Source\Modules</Filter>
+    <ClCompile Include="Menus\Menus.cpp">
+      <Filter>Source\Menus</Filter>
+    </ClCompile>
+    <ClCompile Include="Menus\Native.cpp">
+      <Filter>Source\Menus</Filter>
+    </ClCompile>
+    <ClCompile Include="SpeedrunMenus.cpp">
+      <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Hud\Hud.cpp">
       <Filter>Source\Hud</Filter>
@@ -168,8 +177,14 @@
     <ClInclude Include="Modules\VGui.hpp">
       <Filter>Source\Modules</Filter>
     </ClInclude>
-    <ClInclude Include="Modules\BaseModUI.hpp">
-      <Filter>Source\Modules</Filter>
+    <ClInclude Include="Menus\Menus.hpp">
+      <Filter>Source\Menus</Filter>
+    </ClInclude>
+    <ClInclude Include="Menus\Native.hpp">
+      <Filter>Source\Menus</Filter>
+    </ClInclude>
+    <ClInclude Include="SpeedrunMenus.hpp">
+      <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Hud\Hud.hpp">
       <Filter>Source\Hud</Filter>

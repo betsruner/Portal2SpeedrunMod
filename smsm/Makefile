@@ -9,6 +9,7 @@ SRCS=$(wildcard $(SDIR)/*.cpp)
 SRCS+=$(wildcard $(SDIR)/Utils/*.cpp)
 SRCS+=$(wildcard $(SDIR)/Modules/*.cpp)
 SRCS+=$(wildcard $(SDIR)/Hud/*.cpp)
+SRCS+=$(wildcard $(SDIR)/Menus/*.cpp)
 
 OBJS=$(patsubst $(SDIR)/%.cpp, $(ODIR)/%.o, $(SRCS))
 

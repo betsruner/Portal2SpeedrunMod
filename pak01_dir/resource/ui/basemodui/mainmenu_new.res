@@ -37,7 +37,7 @@
 		"navDown"					"BtnCoOp"
 		"labelText"					"Speedrun Mod"
 		"style"						"MainMenuButton"
-		"command"					"Extras"
+		"command"					"menus_open p2sm_mode_select"
 		"ActivationType"			"1"
 	}
 
@@ -59,38 +59,13 @@
 		"enabled"					"1"
 		"tabPosition"				"0"
 		"navUp"						"BtnExtras"
-		"navDown"					"BtnP2SMSettings"
+		"navDown"					"BtnOptions"
 		"labelText"					"Speedrun Mod Coop"
 		"style"						"MainMenuButton"
 		"command"					"CoopPlay"
 		"ActivationType"			"1"
 	}
-
-	"BtnP2SMSettings"
-	{
-		"ControlName"				"BaseModHybridButton"
-		"fieldName"					"BtnP2SMSettings"
-		"xpos"						"88"	[$GAMECONSOLE && ($GAMECONSOLEWIDE && !$ANAMORPHIC)]
-		"xpos"						"63"	[$GAMECONSOLE && (!$GAMECONSOLEWIDE || $ANAMORPHIC)]
-		"xpos"						"88"	[!$GAMECONSOLE && $WIN32WIDE]
-		"xpos"						"63"	[!$GAMECONSOLE && !$WIN32WIDE]
-		"ypos"						"340"	[$GAMECONSOLE]
-		"ypos"						"318"	[!$GAMECONSOLE]
-		"wide"						"280"
-		"tall"						"20"
-		"autoResize"				"1"
-		"pinCorner"					"0"
-		"visible"					"1"
-		"enabled"					"1"
-		"tabPosition"				"0"
-		"navUp"						"BtnCoOp"
-		"navDown"					"BtnOptions"
-		"labelText"					"P2SM Settings"
-		"style"						"MainMenuButton"
-		"command"					"smsm_open p2sm_settings"
-		"ActivationType"			"1"
-	}
-
+	
 	"BtnOptions"
 	{
 		"ControlName"				"BaseModHybridButton"
@@ -99,8 +74,8 @@
 		"xpos"						"63"	[$GAMECONSOLE && (!$GAMECONSOLEWIDE || $ANAMORPHIC)]	
 		"xpos"						"88"	[!$GAMECONSOLE && $WIN32WIDE]
 		"xpos"						"63"	[!$GAMECONSOLE && !$WIN32WIDE]	
-		"ypos"						"370"	[$GAMECONSOLE]
-		"ypos"						"348"	[!$GAMECONSOLE]
+		"ypos"						"340"	[$GAMECONSOLE]  
+		"ypos"						"318"	[!$GAMECONSOLE] 
 		"wide"						"280"
 		"tall"						"20"
 		"autoResize"				"1"
@@ -108,7 +83,7 @@
 		"visible"					"1"
 		"enabled"					"1"
 		"tabPosition"				"0"
-		"navUp"						"BtnP2SMSettings"
+		"navUp"						"BtnExtras"
 		"navDown"					"BtnQuit"
 		"labelText"					"#PORTAL2_MainMenu_Options"
 		"style"						"MainMenuButton"
@@ -122,7 +97,7 @@
 		"fieldName"					"BtnQuit"
 		"xpos"						"88"	[$WIN32WIDE]
 		"xpos"						"63"	[!$WIN32WIDE]	
-		"ypos"						"378"
+		"ypos"						"348"
 		"wide"						"280"
 		"tall"						"20"
 		"autoResize"				"1"
