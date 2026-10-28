@@ -1,6 +1,5 @@
 #include "Native.hpp"
 
-#include "Utils/Memory.hpp"
 
 namespace Menus::Native {
 
@@ -21,10 +20,39 @@ constexpr const char* FooterSetButtonsSignature = "55 8B EC 8B 45 ? 8B D0 C1 E2 
 constexpr const char* FooterSetButtonTextSignature = "55 8B EC 8B 45 ? 53 8B D9 56";
 constexpr const char* ReleaseActiveMenuControlSignature = "55 8B EC 8B 0D ? ? ? ? 85 C9 74 ? 8B 01 8B 50 ? FF D2";
 
+// The GenericPanelList constructor's prologue matches another class's, so find it by its field setup.
+constexpr const char* ListConstructorSignature = "8B 45 10 89 9E 60 01 00 00 89 9E 64 01 00 00 89 9E 68 01 00 00 89 9E 6C 01 00 00 89 9E 70 01 00 00 33 C9 66 89 8E 14 02 00 00";
+constexpr int ListConstructorSignatureOffset = -0x102;
+constexpr const char* GetUIGameDataSignature = "A1 ? ? ? ? 85 C0 75 2D 38 05 ? ? ? ? 75 25 68 50 01 00 00 E8";
+constexpr const char* AccessAvatarImageSignature = "55 8B EC 83 EC 14 83 7D 10 00 56 8B F1 75 09 33 C0 5E 8B E5 5D C2 10 00 8B 45 0C 53 8B 5D 08 8B CB 0B C8 75 0A";
+// CGameUiAvatarImage::SetAvatarXUID, which starts by loading the client's CSteamAPIContext pointer.
+constexpr const char* SetAvatarXuidSignature = "55 8B EC 0F 57 C0 83 EC 0C 53 56 8B F1 C6 46 1C 00 F3 0F 11 46 20 A1 ? ? ? ? 83 78 08 00 57";
+constexpr int SetAvatarXuidContextOffset = 0x17;
+constexpr int HandleGetVguiOffset = 10; // "8B 0D <g_pVGui>" in PHandle::Get
+constexpr int FindChildPanelInterfaceOffset = 0x15;
+constexpr int FindChildModuleNameCallOffset = 0x66;
+constexpr const char* UtlStringSetSignature = "55 8B EC 56 57 8B 7D 08 8B F1 85 FF 74 1B 57 E8 ? ? ? ? 83 C4 04 40 50 57 8B CE E8 ? ? ? ? 5F 8B C6 5E 5D C2 04 00 33 C0 50 57 8B CE E8";
+constexpr const char* FindChildByNameSignature = "55 8B EC 83 EC 10 53 56 89 4D F8 C7 45 FC 00 00 00 00 57 8B 1D ? ? ? ? 85 DB 74 24 8B 41 04 8B 50 04 8B 44 0A 04 8B 33 8D 4C 0A 04 8B 10 FF D2 50 8B 46 44 8B CB FF D0 8B 1D ? ? ? ? EB 02 33 C0 39 45 FC 0F 8D";
+
 constexpr Layout PlatformLayout {
+    // CBaseModFrame
     0x838, 264, 0x274, 0x278, 0x700,
+    // CBaseModPanel
     0x328, 0x464, 0x4AE, 0x458, 0x578,
-    5, 6, 68, 106, 207, 214, 253, 254,
+    // CBaseModFrame virtuals
+    5, 6, 60, 68, 93, 106, 207, 214, 253, 254,
+    // vgui::Panel
+    0x54, 11, 31, 32, 77, 100,
+    // ISteamFriends017
+    37,
+    // vgui::IPanel
+    5, 10, 16, 17, 18, 55,
+    // ISurface, IInput, IScheme
+    14, 15, 72, 160, 77, 8, 3,
+    // EditablePanel / Label / ImagePanel virtuals
+    183, 189, 184, 184,
+    // GenericPanelList
+    548, 504, 183, 187, 188, 195, 196,
 };
 #else
 // Linux values carried over from the first prototype. The vtable indices are the Windows ones
@@ -44,14 +72,20 @@ constexpr const char* ReleaseActiveMenuControlSignature = "A1 ? ? ? ? 85 C0 74 ?
 constexpr Layout PlatformLayout {
     0xC68, 293, 0x270, 0x274, 0xAFC,
     0x2E0, -1, -1, 0x410, 0x52C,
-    34, 35, 97, 135, 236, 243, 282, 283,
+    34, 35, 89, 97, 122, 135, 236, 243, 282, 283,
+    -1, -1, -1, -1, -1, -1,
+    -1,
+    -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1,
 };
 #endif
 
 template <typename T>
-bool Find(const char* module, const char* signature, T& out)
+bool Find(const char* module, const char* signature, T& out, int offset = 0)
 {
-    out = reinterpret_cast<T>(Memory::Scan(module, signature));
+    out = reinterpret_cast<T>(Support::Scan(module, signature, offset));
     return out != nullptr;
 }
 }
@@ -62,10 +96,15 @@ bool Resolve(const char* clientModule)
 #ifndef _WIN32
     return false;
 #else
-    return Find(clientModule, GetPanelSingletonSignature, functions.getPanelSingleton)
+    const bool found = Find(clientModule, GetPanelSingletonSignature, functions.getPanelSingleton)
         && Find(clientModule, AllocateSignature, functions.allocate)
         && Find(clientModule, FrameConstructorSignature, functions.frameConstructor)
         && Find(clientModule, SetDialogTitleSignature, functions.setDialogTitle)
+        && Find(clientModule, ListConstructorSignature, functions.listConstructor, ListConstructorSignatureOffset)
+        && Find(clientModule, FindChildByNameSignature, functions.findChildByName)
+        && Find(clientModule, UtlStringSetSignature, functions.utlStringSet)
+        && Find(clientModule, GetUIGameDataSignature, functions.getUIGameData)
+        && Find(clientModule, AccessAvatarImageSignature, functions.accessAvatarImage)
         && Find(clientModule, OpenWindowSignature, functions.openWindow)
         && Find(clientModule, HandleGetSignature, functions.handleGet)
         && Find(clientModule, HandleSetSignature, functions.handleSet)
@@ -73,6 +112,22 @@ bool Resolve(const char* clientModule)
         && Find(clientModule, FooterSetButtonsSignature, functions.footerSetButtons)
         && Find(clientModule, FooterSetButtonTextSignature, functions.footerSetButtonText)
         && Find(clientModule, ReleaseActiveMenuControlSignature, functions.releaseActiveMenuControl);
+    if (!found)
+        return false;
+
+    // FindChildByName starts with "mov ebx, [g_pVGuiPanel]" and calls GetControlsModuleName.
+    const auto findChild = reinterpret_cast<uintptr_t>(functions.findChildByName);
+    functions.panelInterface = *reinterpret_cast<void***>(findChild + FindChildPanelInterfaceOffset);
+    functions.controlsModuleName = Support::ReadRelative<Functions::ControlsModuleName>(findChild + FindChildModuleNameCallOffset);
+
+    // Without it, avatars of players who aren't Steam friends just never load.
+    const uintptr_t setAvatar = Support::Scan(clientModule, SetAvatarXuidSignature);
+    functions.steamApiContext = setAvatar ? *reinterpret_cast<void***>(setAvatar + SetAvatarXuidContextOffset) : nullptr;
+
+    functions.surface = Support::GetInterface(MENUS_MODULE("vguimatsurface"), "VGUI_Surface031");
+    functions.input = Support::GetInterface(MENUS_MODULE("vgui2"), "VGUI_Input005");
+    functions.vgui = *reinterpret_cast<void***>(reinterpret_cast<uintptr_t>(functions.handleGet) + HandleGetVguiOffset);
+    return functions.panelInterface && functions.controlsModuleName && functions.surface && functions.input && functions.vgui;
 #endif
 }
 

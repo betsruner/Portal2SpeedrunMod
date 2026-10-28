@@ -1,4 +1,6 @@
 #pragma once
 
+#include "Menus/Menus.hpp"
+
 // Registers Speedrun Mod's custom menu panels with the menu system.
-void RegisterSpeedrunMenus();
+void RegisterSpeedrunMenus(Menus::System* menus);

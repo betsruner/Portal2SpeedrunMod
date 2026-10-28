@@ -94,7 +94,16 @@
     <ClCompile Include="Menus\Native.cpp">
       <Filter>Source\Menus</Filter>
     </ClCompile>
+    <ClCompile Include="Menus\Support.cpp">
+      <Filter>Source\Menus</Filter>
+    </ClCompile>
+    <ClCompile Include="CustomMenus.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
     <ClCompile Include="SpeedrunMenus.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Leaderboards.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Hud\Hud.cpp">
@@ -183,7 +192,16 @@
     <ClInclude Include="Menus\Native.hpp">
       <Filter>Source\Menus</Filter>
     </ClInclude>
+    <ClInclude Include="Menus\Support.hpp">
+      <Filter>Source\Menus</Filter>
+    </ClInclude>
+    <ClInclude Include="CustomMenus.hpp">
+      <Filter>Source</Filter>
+    </ClInclude>
     <ClInclude Include="SpeedrunMenus.hpp">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Leaderboards.hpp">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Hud\Hud.hpp">

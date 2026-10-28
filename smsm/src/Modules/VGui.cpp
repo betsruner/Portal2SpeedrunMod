@@ -12,14 +12,15 @@
 #include "Offsets.hpp"
 #include "Utils.hpp"
 #include "CelesteMoveset.hpp"
-#include "Menus/Menus.hpp"
+#include "CustomMenus.hpp"
 
 REDECL(VGui::Paint);
 
 // CEngineVGui::Paint
 DETOUR(VGui::Paint, int mode)
 {
-    Menus::Tick();
+    if (menus)
+        menus->Tick();
 
     // drawing custom gui only once per frame
     // flag is set by RenderView detour in client

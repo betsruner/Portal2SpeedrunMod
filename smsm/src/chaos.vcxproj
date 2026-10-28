@@ -94,7 +94,10 @@
     <ClCompile Include="CelesteMoveset.cpp" />
     <ClCompile Include="Menus\Menus.cpp" />
     <ClCompile Include="Menus\Native.cpp" />
+    <ClCompile Include="Menus\Support.cpp" />
+    <ClCompile Include="CustomMenus.cpp" />
     <ClCompile Include="SpeedrunMenus.cpp" />
+    <ClCompile Include="Leaderboards.cpp" />
     <ClCompile Include="Hud\Hud.cpp" />
     <ClCompile Include="Modules\Server.cpp" />
     <ClCompile Include="Modules\Surface.cpp" />
@@ -122,7 +125,10 @@
     <ClInclude Include="CelesteMoveset.hpp" />
     <ClInclude Include="Menus\Menus.hpp" />
     <ClInclude Include="Menus\Native.hpp" />
+    <ClInclude Include="Menus\Support.hpp" />
+    <ClInclude Include="CustomMenus.hpp" />
     <ClInclude Include="SpeedrunMenus.hpp" />
+    <ClInclude Include="Leaderboards.hpp" />
     <ClInclude Include="Hud\Hud.hpp" />
     <ClInclude Include="Modules\Server.hpp" />
     <ClInclude Include="Modules\Surface.hpp" />

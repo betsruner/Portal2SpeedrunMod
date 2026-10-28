@@ -1,12 +1,255 @@
 #include "SpeedrunMenus.hpp"
 
-#include <cstdlib>
+#include <algorithm>
+#include <cstdio>
+#include <vector>
 
-#include "Command.hpp"
-#include "Menus/Menus.hpp"
+#include "Leaderboards.hpp"
 #include "Modules/Console.hpp"
+#include "Modules/Engine.hpp"
 
 namespace {
+// vgui ButtonCode_t for the controller A button (and the second controller's), which the footer's primary button sends.
+constexpr int KeyXButtonA = 114;
+constexpr int KeyXButtonA2 = 306;
+
+// Single player challenge mode maps, by chapter, with their board.portal2.sr chamber (Steam leaderboard) ids.
+struct ChallengeMap {
+    const char* name;
+    const char* bsp;
+    int chamberId;
+};
+
+const ChallengeMap ChapterOneMaps[] = {
+    { "Container Ride", "sp_a1_intro1", 62761 }, { "Portal Carousel", "sp_a1_intro2", 62758 },
+    { "Portal Gun", "sp_a1_intro3", 47458 }, { "Smooth Jazz", "sp_a1_intro4", 47455 },
+    { "Cube Momentum", "sp_a1_intro5", 47452 }, { "Future Starter", "sp_a1_intro6", 47106 },
+    { "Secret Panel", "sp_a1_intro7", 62763 }, { "Wakeup", "sp_a1_wakeup", 62759 },
+    { "Incinerator", "sp_a2_intro", 47735 },
+};
+const ChallengeMap ChapterTwoMaps[] = {
+    { "Laser Intro", "sp_a2_laser_intro", 62765 }, { "Laser Stairs", "sp_a2_laser_stairs", 47736 },
+    { "Dual Lasers", "sp_a2_dual_lasers", 47738 }, { "Laser Over Goo", "sp_a2_laser_over_goo", 47742 },
+    { "Catapult Intro", "sp_a2_catapult_intro", 62767 }, { "Trust Fling", "sp_a2_trust_fling", 47744 },
+    { "Pit Flings", "sp_a2_pit_flings", 47465 }, { "Fizzler Intro", "sp_a2_fizzler_intro", 47746 },
+};
+const ChallengeMap ChapterThreeMaps[] = {
+    { "Ceiling Catapult", "sp_a2_sphere_peek", 47748 }, { "Ricochet", "sp_a2_ricochet", 47751 },
+    { "Bridge Intro", "sp_a2_bridge_intro", 47752 }, { "Bridge the Gap", "sp_a2_bridge_the_gap", 47755 },
+    { "Turret Intro", "sp_a2_turret_intro", 47756 }, { "Laser Relays", "sp_a2_laser_relays", 47759 },
+    { "Turret Blocker", "sp_a2_turret_blocker", 47760 }, { "Laser vs Turret", "sp_a2_laser_vs_turret", 47763 },
+    { "Pull the Rug", "sp_a2_pull_the_rug", 47764 },
+};
+const ChallengeMap ChapterFourMaps[] = {
+    { "Column Blocker", "sp_a2_column_blocker", 47766 }, { "Laser Chaining", "sp_a2_laser_chaining", 47768 },
+    { "Triple Laser", "sp_a2_triple_laser", 47770 }, { "Jail Break", "sp_a2_bts1", 47773 },
+    { "Escape", "sp_a2_bts2", 47774 },
+};
+const ChallengeMap ChapterFiveMaps[] = {
+    { "Turret Factory", "sp_a2_bts3", 47776 }, { "Turret Sabotage", "sp_a2_bts4", 47779 },
+    { "Neurotoxin Sabotage", "sp_a2_bts5", 47780 }, { "Core", "sp_a2_core", 62771 },
+};
+const ChallengeMap ChapterSixMaps[] = {
+    { "Underground", "sp_a3_01", 47783 }, { "Cave Johnson", "sp_a3_03", 47784 },
+    { "Repulsion Intro", "sp_a3_jump_intro", 47787 }, { "Bomb Flings", "sp_a3_bomb_flings", 47468 },
+    { "Crazy Box", "sp_a3_crazy_box", 47469 }, { "PotatOS", "sp_a3_transition01", 47472 },
+};
+const ChallengeMap ChapterSevenMaps[] = {
+    { "Propulsion Intro", "sp_a3_speed_ramp", 47791 }, { "Propulsion Flings", "sp_a3_speed_flings", 47793 },
+    { "Conversion Intro", "sp_a3_portal_intro", 47795 }, { "Three Gels", "sp_a3_end", 47798 },
+};
+const ChallengeMap ChapterEightMaps[] = {
+    { "Test", "sp_a4_intro", 88350 }, { "Funnel Intro", "sp_a4_tb_intro", 47800 },
+    { "Ceiling Button", "sp_a4_tb_trust_drop", 47802 }, { "Wall Button", "sp_a4_tb_wall_button", 47804 },
+    { "Polarity", "sp_a4_tb_polarity", 47806 }, { "Funnel Catch", "sp_a4_tb_catch", 47808 },
+    { "Stop the Box", "sp_a4_stop_the_box", 47811 }, { "Laser Catapult", "sp_a4_laser_catapult", 47813 },
+    { "Laser Platform", "sp_a4_laser_platform", 47815 }, { "Propulsion Catch", "sp_a4_speed_tb_catch", 47817 },
+    { "Repulsion Polarity", "sp_a4_jump_polarity", 47819 },
+};
+const ChallengeMap ChapterNineMaps[] = {
+    { "Finale 1", "sp_a4_finale1", 62776 }, { "Finale 2", "sp_a4_finale2", 47821 },
+    { "Finale 3", "sp_a4_finale3", 47824 }, { "Finale 4", "sp_a4_finale4", 47456 },
+};
+
+struct Chapter {
+    const ChallengeMap* maps;
+    int count;
+};
+
+#define CHAPTER(maps) { maps, static_cast<int>(sizeof(maps) / sizeof(maps[0])) }
+const Chapter Chapters[] = {
+    CHAPTER(ChapterOneMaps), CHAPTER(ChapterTwoMaps), CHAPTER(ChapterThreeMaps),
+    CHAPTER(ChapterFourMaps), CHAPTER(ChapterFiveMaps), CHAPTER(ChapterSixMaps),
+    CHAPTER(ChapterSevenMaps), CHAPTER(ChapterEightMaps), CHAPTER(ChapterNineMaps),
+};
+constexpr int ChapterCount = static_cast<int>(sizeof(Chapters) / sizeof(Chapters[0]));
+// board.portal2.sr returns the top 500; building that many rows at once hitches the menu.
+constexpr int MaxLeaderboardEntries = 200;
+
+// Leaderboard categories. Any% is what board.portal2.sr serves; the rest are mock-ups until real
+// category data exists (see MockCategory).
+const char* const Categories[] = { "ANY%", "INBOUNDS", "NO SLA", "GLITCHLESS" };
+constexpr int CategoryCount = static_cast<int>(sizeof(Categories) / sizeof(Categories[0]));
+
+// Fake board for a mock category: the Any% runners, some of them dropped, with slower times.
+std::vector<Leaderboards::Entry> MockCategory(const std::vector<Leaderboards::Entry>& anyPercent, int category)
+{
+    std::vector<Leaderboards::Entry> entries;
+    for (const auto& entry : anyPercent) {
+        if ((entry.steamId >> category) % 4 == 0)
+            continue;
+        Leaderboards::Entry mock = entry;
+        mock.centiseconds = entry.centiseconds * (100 + 9 * category) / 100 + static_cast<int>(entry.steamId % 97) * category;
+        entries.push_back(mock);
+    }
+    std::stable_sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) { return a.centiseconds < b.centiseconds; });
+    for (size_t i = 0; i < entries.size(); ++i)
+        entries[i].rank = i && entries[i].centiseconds == entries[i - 1].centiseconds ? entries[i - 1].rank : static_cast<int>(i) + 1;
+    return entries;
+}
+
+// The stock map list's selected row: HybridButton.CursorColor and HybridButton.FocusColor in basemodui_scheme.res.
+constexpr Menus::Color SelectedRowColor { 0, 0, 0, 240 };
+constexpr Menus::Color SelectedTextColor { 240, 240, 240, 255 };
+constexpr Menus::Color RowColor { 0, 0, 0, 0 };
+constexpr Menus::Color TextColor { 0, 0, 0, 255 };
+
+// Challenge Mode: chapter selector, the chapter's maps, and the selected map's board.portal2.sr leaderboard.
+class ChallengeModePanel : public Menus::Panel {
+public:
+    void OnCreate() override
+    {
+        this->maps = this->CreateList("MapList");
+        this->leaderboard = this->CreateList("LeaderboardList");
+        this->categories = this->CreateSelector("CategorySelector");
+    }
+
+    void OnOpen() override
+    {
+        if (this->categories) {
+            this->categories->SetOptions(Categories, CategoryCount);
+            this->categories->Select(0);
+        }
+        std::vector<int> chambers;
+        for (auto& chapter : Chapters) {
+            for (int i = 0; i < chapter.count; ++i)
+                chambers.push_back(chapter.maps[i].chamberId);
+        }
+        Leaderboards::Prefetch(chambers);
+        this->ShowChapter(0);
+    }
+
+    bool OnCommand(const char* command) override
+    {
+        int chapter = 0;
+        if (std::sscanf(command, "SelectedChapter:%d", &chapter) == 1) {
+            this->ShowChapter(chapter - 1);
+            return true;
+        }
+        return false;
+    }
+
+    bool OnKeyCodePressed(int code) override
+    {
+        if (code != KeyXButtonA && code != KeyXButtonA2)
+            return false;
+        const int map = this->maps ? this->maps->Selected() : -1;
+        if (map >= 0) {
+            char command[64];
+            std::snprintf(command, sizeof(command), "map %s\n", Chapters[this->chapter].maps[map].bsp);
+            engine->Cbuf_AddText(0, command, 0);
+        }
+        return true;
+    }
+
+    void OnTick() override
+    {
+        if (!this->maps)
+            return;
+        const int selected = this->maps->Selected();
+        const int category = this->categories ? this->categories->Selected() : 0;
+        if (selected != this->shownMap || category != this->shownCategory)
+            this->ShowLeaderboard(selected);
+        if (this->shownMap >= 0 && this->filledMap != this->shownMap)
+            this->TryFillLeaderboard();
+
+        for (int i = 0; i < this->maps->Count(); ++i) {
+            this->maps->SetItemBackground(i, i == selected ? SelectedRowColor : RowColor);
+            this->maps->SetItemTextColor(i, "LblMapName", i == selected ? SelectedTextColor : TextColor);
+        }
+    }
+
+private:
+    void ShowChapter(int chapter)
+    {
+        if (!this->maps || chapter < 0 || chapter >= ChapterCount)
+            return;
+        this->chapter = chapter;
+        this->maps->Clear();
+        for (int i = 0; i < Chapters[chapter].count; ++i) {
+            const int item = this->maps->Add("P2SMChallengeMapItem");
+            this->maps->SetItemText(item, "LblMapName", Chapters[chapter].maps[i].name);
+        }
+        this->maps->Select(0);
+        this->ShowLeaderboard(this->maps->Selected());
+    }
+
+    void ShowLeaderboard(int map)
+    {
+        this->shownMap = map;
+        this->shownCategory = this->categories ? this->categories->Selected() : 0;
+        this->filledMap = -1;
+        if (this->leaderboard)
+            this->leaderboard->Clear();
+        this->SetControlText("LblLeaderboardStatus", map >= 0 ? "Loading leaderboard..." : "");
+        if (map >= 0)
+            Leaderboards::Request(Chapters[this->chapter].maps[map].chamberId);
+    }
+
+    void TryFillLeaderboard()
+    {
+        std::vector<Leaderboards::Entry> entries;
+        switch (Leaderboards::Get(Chapters[this->chapter].maps[this->shownMap].chamberId, entries)) {
+        case Leaderboards::State::Failed:
+            this->filledMap = this->shownMap;
+            this->SetControlText("LblLeaderboardStatus", "Couldn't reach board.portal2.sr.");
+            return;
+        case Leaderboards::State::Ready:
+            break;
+        default:
+            return;
+        }
+
+        this->filledMap = this->shownMap;
+        if (this->shownCategory > 0)
+            entries = MockCategory(entries, this->shownCategory);
+        this->SetControlText("LblLeaderboardStatus", entries.empty() ? "No times yet." : "");
+        if (!this->leaderboard)
+            return;
+        const int count = std::min(static_cast<int>(entries.size()), MaxLeaderboardEntries);
+        for (int i = 0; i < count; ++i) {
+            const Leaderboards::Entry& entry = entries[i];
+            char time[16], rank[16];
+            std::snprintf(time, sizeof(time), "%d:%02d.%02d", entry.centiseconds / 6000, entry.centiseconds / 100 % 60, entry.centiseconds % 100);
+            std::snprintf(rank, sizeof(rank), "#%d", entry.rank);
+
+            const int item = this->leaderboard->Add("P2SMLeaderboardEntry");
+            this->leaderboard->SetItemText(item, "LblPlayerName", entry.name.c_str());
+            this->leaderboard->SetItemText(item, "LblTime", time);
+            this->leaderboard->SetItemText(item, "LblRank", rank);
+            this->leaderboard->SetItemAvatar(item, "ImgAvatar", entry.steamId);
+        }
+    }
+
+    Menus::List* maps = nullptr;
+    Menus::List* leaderboard = nullptr;
+    Menus::Selector* categories = nullptr;
+    int chapter = 0;
+    int shownMap = -1;
+    int shownCategory = 0;
+    int filledMap = -1;
+};
+
 // Placeholder until the real panels exist: logs its lifecycle so menu navigation can be traced in the console.
 class PlaceholderPanel : public Menus::Panel {
 public:
@@ -26,42 +269,18 @@ private:
 #define PLACEHOLDER(name) +[]() -> Menus::Panel* { return new PlaceholderPanel(name); }
 }
 
-void RegisterSpeedrunMenus()
+void RegisterSpeedrunMenus(Menus::System* menus)
 {
     // Main menu "Speedrun Mod" button -> pick Full Game or Challenge Mode.
-    Menus::Register({ "p2sm_mode_select", "P2SMModeSelect", "Speedrun Mod", PLACEHOLDER("p2sm_mode_select") });
-    Menus::Register({ "p2sm_full_game", "P2SMFullGame", "Full Game", PLACEHOLDER("p2sm_full_game") });
-    Menus::Register({ "p2sm_challenge_mode", "P2SMChallengeMode", "Challenge Mode", PLACEHOLDER("p2sm_challenge_mode") });
+    menus->Register({ "p2sm_mode_select", "P2SMModeSelect", "Speedrun Mod", PLACEHOLDER("p2sm_mode_select") });
+    menus->Register({ "p2sm_full_game", "P2SMFullGame", "Full Game", PLACEHOLDER("p2sm_full_game") });
+    // The stock leaderboard's strings live in portal2_dlc1, which the mod doesn't search, so use plain text.
+    menus->Register({ "p2sm_challenge_mode", "P2SMChallengeMode", "Leaderboards",
+        +[]() -> Menus::Panel* { return new ChallengeModePanel(); }, true, Menus::Layer::Page, "#PORTAL2_PlaySelectedMap" });
     // Options -> Speedrun Mod settings.
-    Menus::Register({ "p2sm_settings", "P2SMSettings", "Speedrun Mod", PLACEHOLDER("p2sm_settings") });
+    menus->Register({ "p2sm_settings", "P2SMSettings", "Speedrun Mod", PLACEHOLDER("p2sm_settings") });
 
     // Navigation tests: a third level of pages and a popup.
-    Menus::Register({ "p2sm_test_page", "P2SMTestPage", "Third Page", PLACEHOLDER("p2sm_test_page") });
-    Menus::Register({ "p2sm_test_popup", "P2SMTestPopup", "Popup", PLACEHOLDER("p2sm_test_popup"), false, Menus::Layer::Popup });
-}
-
-CON_COMMAND(menus_open, "menus_open <id> : Opens a custom menu panel over the active one.\n")
-{
-    if (args.ArgC() != 2)
-        return console->Print(menus_open.ThisPtr()->m_pszHelpString);
-    if (!Menus::Open(args[1]))
-        console->Print("Could not open panel '%s'.\n", args[1]);
-}
-
-CON_COMMAND(menus_open_native, "menus_open_native <window type> : Opens a stock BaseModUI panel over the active one.\n")
-{
-    if (args.ArgC() != 2)
-        return console->Print(menus_open_native.ThisPtr()->m_pszHelpString);
-    if (!Menus::OpenNative(std::atoi(args[1])))
-        console->Print("Could not open window type %s.\n", args[1]);
-}
-
-CON_COMMAND(menus_back, "Navigates back from the active menu panel.\n")
-{
-    Menus::Back();
-}
-
-CON_COMMAND(menus_dump, "Prints the menu system's native window slots and custom panel stacks.\n")
-{
-    Menus::Dump();
+    menus->Register({ "p2sm_test_page", "P2SMTestPage", "Third Page", PLACEHOLDER("p2sm_test_page") });
+    menus->Register({ "p2sm_test_popup", "P2SMTestPopup", "Popup", PLACEHOLDER("p2sm_test_popup"), false, Menus::Layer::Popup });
 }
