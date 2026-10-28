@@ -9,7 +9,6 @@ SRCS=$(wildcard $(SDIR)/*.cpp)
 SRCS+=$(wildcard $(SDIR)/Utils/*.cpp)
 SRCS+=$(wildcard $(SDIR)/Modules/*.cpp)
 SRCS+=$(wildcard $(SDIR)/Hud/*.cpp)
-SRCS+=$(wildcard $(SDIR)/Menus/*.cpp)
 
 OBJS=$(patsubst $(SDIR)/%.cpp, $(ODIR)/%.o, $(SRCS))
 
@@ -17,7 +16,7 @@ OBJS=$(patsubst $(SDIR)/%.cpp, $(ODIR)/%.o, $(SRCS))
 DEPS=$(OBJS:%.o=%.d)
 
 WARNINGS=-Wall -Wno-unused-function -Wno-unused-variable -Wno-parentheses -Wno-unknown-pragmas -Wno-register -Wno-sign-compare -Wno-reorder -Wno-class-memaccess
-CXXFLAGS=-std=c++17 -m32 $(WARNINGS) -I$(SDIR) -fPIC -D_GNU_SOURCE
+CXXFLAGS=-std=c++17 -m32 $(WARNINGS) -I$(SDIR) -I../custommenus/include -fPIC -D_GNU_SOURCE
 LDFLAGS=-m32 -shared -lstdc++fs
 
 # Import config.mk, which can be used for optional config

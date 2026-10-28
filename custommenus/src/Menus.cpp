@@ -1,4 +1,4 @@
-#include "Menus.hpp"
+#include "CustomMenus.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -737,6 +737,20 @@ public:
             stack.clear();
     }
 
+    // Presses Back on custom panels until a stock one is active again, so closing them doesn't
+    // leave the menus with nothing showing.
+    static void BackOut()
+    {
+        void* manager = Manager();
+        const size_t open = instances.size();
+        for (size_t presses = 0; manager && presses < open; ++presses) {
+            void* active = ActiveWindow(manager);
+            if (!active || !instances.count(active))
+                break;
+            NavigateBack(active);
+        }
+    }
+
     static void CloseAll()
     {
         for (auto& stack : stacks) {
@@ -983,6 +997,7 @@ void SystemImpl::Shutdown()
         return;
     if (*functions.vgui) {
         MenuSystem::Prune();
+        MenuSystem::BackOut();
         MenuSystem::CloseAll();
     } else {
         // The game is quitting: vgui shut down and deleted every window before unloading plugins,

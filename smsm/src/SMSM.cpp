@@ -23,7 +23,7 @@
 #include "Utils/Memory.hpp"
 #include "Hud/Hud.hpp"
 #include "Leaderboards.hpp"
-#include "CustomMenus.hpp"
+#include "MenuHost.hpp"
 
 SMSM smsm;
 EXPOSE_SINGLE_INTERFACE_GLOBALVAR(SMSM, IServerPluginCallbacks, INTERFACEVERSION_ISERVERPLUGINCALLBACKS, smsm);

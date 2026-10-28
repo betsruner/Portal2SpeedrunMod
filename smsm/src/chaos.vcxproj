@@ -49,7 +49,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\..\custommenus\include</AdditionalIncludeDirectories>
       <AdditionalUsingDirectories>$(ProjectDir)</AdditionalUsingDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -92,10 +92,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CelesteMoveset.cpp" />
-    <ClCompile Include="Menus\Menus.cpp" />
-    <ClCompile Include="Menus\Native.cpp" />
-    <ClCompile Include="Menus\Support.cpp" />
-    <ClCompile Include="CustomMenus.cpp" />
+    <ClCompile Include="MenuHost.cpp" />
     <ClCompile Include="SpeedrunMenus.cpp" />
     <ClCompile Include="Leaderboards.cpp" />
     <ClCompile Include="Hud\Hud.cpp" />
@@ -123,10 +120,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CelesteMoveset.hpp" />
-    <ClInclude Include="Menus\Menus.hpp" />
-    <ClInclude Include="Menus\Native.hpp" />
-    <ClInclude Include="Menus\Support.hpp" />
-    <ClInclude Include="CustomMenus.hpp" />
+    <ClInclude Include="MenuHost.hpp" />
     <ClInclude Include="SpeedrunMenus.hpp" />
     <ClInclude Include="Leaderboards.hpp" />
     <ClInclude Include="Hud\Hud.hpp" />
