@@ -43,19 +43,17 @@ constexpr Layout PlatformLayout {
     // CBaseModFrame virtuals
     5, 6, 60, 68, 93, 106, 207, 214, 253, 254,
     // vgui::Panel
-    0x54, 11, 31, 32, 77, 100,
+    0x54, 11, 31, 32, 77, 78, 100,
     // ISteamFriends017
     37,
     // vgui::IPanel
-    5, 10, 16, 17, 18, 55,
+    2, 4, 5, 10, 16, 17, 18, 55,
     // ISurface, IInput, IScheme
     14, 15, 72, 160, 77, 8, 3,
     // EditablePanel / Label / ImagePanel virtuals
-    183, 189, 184, 184,
+    183, 189, 184, 184, 183,
     // GenericPanelList
     548, 504, 183, 187, 188, 195, 196,
-    // Added later: ImagePanel::SetImage(const char*), IPanel::SetPos / SetSize, Panel::OnMouseDoublePressed
-    183, 2, 4, 78,
 };
 #else
 // Linux values carried over from the first prototype. The vtable indices are the Windows ones
@@ -76,13 +74,12 @@ constexpr Layout PlatformLayout {
     0xC68, 293, 0x270, 0x274, 0xAFC,
     0x2E0, -1, -1, 0x410, 0x52C,
     34, 35, 89, 97, 122, 135, 236, 243, 282, 283,
-    -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1,
     -1,
-    -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1,
+    -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1,
 };
 #endif
 

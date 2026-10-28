@@ -7,6 +7,7 @@
 #include <iterator>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "Native.hpp"
@@ -66,7 +67,7 @@ constexpr int AvatarReleaseDelay = 3;
 std::vector<std::pair<uint64_t, int>> pendingAvatarReleases; // steam id, ticks left
 // Avatars that aren't downloaded yet are retried this often.
 constexpr int AvatarRetryTicks = 30;
-std::unordered_map<uint64_t, bool> requestedUsers;
+std::unordered_set<uint64_t> requestedUsers;
 
 // Steam only fetches avatars of players who aren't friends once asked about them.
 void RequestUser(uint64_t steamId)
@@ -77,7 +78,7 @@ void RequestUser(uint64_t steamId)
     if (!steamFriends)
         return;
     Virtual<Functions::RequestUserInformation>(steamFriends, layout.steamFriendsRequestUserInformation)(steamFriends, steamId, false);
-    requestedUsers[steamId] = true;
+    requestedUsers.insert(steamId);
 }
 
 void ReleasePendingAvatars()
@@ -115,6 +116,53 @@ int NativeColor(Color color)
     return color.r | color.g << 8 | color.b << 16 | color.a << 24;
 }
 
+void SetBackground(void* panel, Color color)
+{
+    Virtual<Functions::FrameInt>(panel, layout.setBgColor)(panel, NativeColor(color));
+}
+
+bool SetChildTextColor(void* panel, const char* control, Color color)
+{
+    void* child = panel && control ? functions.findChildByName(panel, control, true) : nullptr;
+    if (!child)
+        return false;
+    Virtual<Functions::FrameInt>(child, layout.setFgColor)(child, NativeColor(color));
+    return true;
+}
+
+// Builds an EditablePanel from Resource/UI/BaseModUI/<resource>.res, with the factory the .res
+// loader uses. It's named after the file because the file's root block only applies to a panel
+// with that name. resource must have passed ValidName.
+void* CreateItem(void* frame, const char* resource)
+{
+    void* item = Virtual<Functions::CreateControlByName>(frame, layout.createControlByName)(frame, "EditablePanel");
+    if (!item)
+        return nullptr;
+    char path[64];
+    std::snprintf(path, sizeof(path), "Resource/UI/BaseModUI/%s.res", resource);
+    functions.utlStringSet(&Field<char>(item, layout.panelName), resource);
+    Virtual<Functions::FrameBool>(item, layout.setProportional)(item, true);
+    Virtual<Functions::LoadControlSettings>(item, layout.loadControlSettings)(item, path, nullptr, nullptr, nullptr);
+    return item;
+}
+
+// Constructs a BaseModUI::GenericPanelList child of the frame, before its .res is loaded so the
+// .res entry with the same name styles it.
+void* CreateNativeList(void* frame, const char* name)
+{
+    void* list = functions.allocate(layout.listSize);
+    if (list)
+        functions.listConstructor(list, frame, name, 5, true); // same arguments the stock leaderboard uses
+    return list;
+}
+
+// Called from the frame's ApplySchemeSettings, which resets these.
+void ShowScrollBar(void* list)
+{
+    Virtual<Functions::FrameBool>(list, layout.listSetScrollBarVisible)(list, true);
+    Virtual<Functions::FrameBool>(list, layout.listSetScrollArrowsVisible)(list, false);
+}
+
 class ListImpl;
 class GridImpl;
 class SelectorImpl;
@@ -128,72 +176,10 @@ std::unordered_map<void*, SelectorImpl*> selectors;
 std::unordered_map<uintptr_t*, uintptr_t> mouseVtables; // patched vtable -> original OnMousePressed
 std::unordered_map<uintptr_t*, uintptr_t> doubleVtables; // patched vtable -> original OnMouseDoublePressed
 std::unordered_map<uintptr_t*, uintptr_t> paintVtables; // patched vtable -> original Paint
-void SelectItem(ListImpl* list, void* item);
-void ClickGridTile(GridImpl* grid, void* tile, bool doubleClick);
-void ClickSelector(SelectorImpl* selector);
-void PaintSelector(SelectorImpl* selector);
 MENUS_DECL_DETOUR(void, ItemOnMousePressed, int code);
 MENUS_DECL_DETOUR(void, ItemOnMouseDoublePressed, int code);
 MENUS_DECL_DETOUR(void, PanelPaint);
 
-MENUS_DETOUR(void, PanelPaint)
-{
-    auto original = paintVtables.find(*reinterpret_cast<uintptr_t**>(thisptr));
-    if (original != paintVtables.end())
-        reinterpret_cast<_PanelPaint>(original->second)(thisptr);
-    auto selector = selectors.find(thisptr);
-    if (selector != selectors.end())
-        PaintSelector(selector->second);
-}
-
-// A left click on one of our panels, or anything inside a list item or grid tile. Returns false
-// if it wasn't ours. vgui sends the second press of a double-click to OnMouseDoublePressed.
-bool HandleClick(void* clicked, bool doubleClick)
-{
-    auto selector = selectors.find(clicked);
-    if (selector != selectors.end()) {
-        ClickSelector(selector->second);
-        return true;
-    }
-    void* panel = clicked;
-    void* child = nullptr;
-    for (int depth = 0; panel && depth < 4; ++depth) {
-        auto owner = listItems.find(panel);
-        if (owner != listItems.end()) {
-            SelectItem(owner->second, panel);
-            return true;
-        }
-        // A grid row's children are its tiles. A double-click activates the tile, and the panel
-        // can close itself in response, so nothing may be touched afterwards.
-        auto grid = gridRows.find(panel);
-        if (grid != gridRows.end()) {
-            if (child)
-                ClickGridTile(grid->second, child, doubleClick);
-            return true;
-        }
-        child = panel;
-        panel = Virtual<Functions::PanelGetParent>(panel, layout.getParent)(panel);
-    }
-    return false;
-}
-
-MENUS_DETOUR(void, ItemOnMousePressed, int code)
-{
-    if (code == MouseLeft && HandleClick(thisptr, false))
-        return;
-    auto original = mouseVtables.find(*reinterpret_cast<uintptr_t**>(thisptr));
-    if (original != mouseVtables.end())
-        reinterpret_cast<_ItemOnMousePressed>(original->second)(thisptr, code);
-}
-
-MENUS_DETOUR(void, ItemOnMouseDoublePressed, int code)
-{
-    if (code == MouseLeft && HandleClick(thisptr, true))
-        return;
-    auto original = doubleVtables.find(*reinterpret_cast<uintptr_t**>(thisptr));
-    if (original != doubleVtables.end())
-        reinterpret_cast<_ItemOnMouseDoublePressed>(original->second)(thisptr, code);
-}
 
 void PatchVirtual(void* panel, int index, uintptr_t hook, std::unordered_map<uintptr_t*, uintptr_t>& originals)
 {
@@ -382,16 +368,6 @@ private:
     int rightArrowStart = 0;
 };
 
-void ClickSelector(SelectorImpl* selector)
-{
-    selector->Click();
-}
-
-void PaintSelector(SelectorImpl* selector)
-{
-    selector->Paint();
-}
-
 class ListImpl final : public List {
 public:
     ListImpl(void* frame, void* list)
@@ -413,18 +389,9 @@ public:
 
     int Add(const char* resource) override
     {
-        if (!ValidName(resource, MaxResourceLength))
-            return -1;
-        // Same factory the .res loader uses, so any registered control could be an item.
-        void* item = Virtual<Functions::CreateControlByName>(this->frame, layout.createControlByName)(this->frame, "EditablePanel");
+        void* item = ValidName(resource, MaxResourceLength) ? CreateItem(this->frame, resource) : nullptr;
         if (!item)
             return -1;
-
-        char path[64];
-        std::snprintf(path, sizeof(path), "Resource/UI/BaseModUI/%s.res", resource);
-        functions.utlStringSet(&Field<char>(item, layout.panelName), resource);
-        Virtual<Functions::FrameBool>(item, layout.setProportional)(item, true);
-        Virtual<Functions::LoadControlSettings>(item, layout.loadControlSettings)(item, path, nullptr, nullptr, nullptr);
         Virtual<Functions::ListAddItem>(this->list, layout.listAddItem)(this->list, item, true);
         PatchMouseTree(item);
         listItems[item] = this;
@@ -436,12 +403,12 @@ public:
 
     bool SetItemText(int index, const char* control, const char* text) override
     {
-        return index >= 0 && index < this->Count() && SetChildText(this->items[index], control, text);
+        return this->Has(index) && SetChildText(this->items[index], control, text);
     }
 
     bool SetItemAvatar(int index, const char* control, unsigned long long steamId) override
     {
-        if (index < 0 || index >= this->Count() || !control || !steamId)
+        if (!this->Has(index) || !control || !steamId)
             return false;
         if (!this->LoadAvatar(this->items[index], control, steamId)) {
             RequestUser(steamId);
@@ -458,19 +425,14 @@ public:
 
     bool SetItemBackground(int index, Color color) override
     {
-        if (index < 0 || index >= this->Count())
-            return false;
-        Virtual<Functions::FrameInt>(this->items[index], layout.setBgColor)(this->items[index], NativeColor(color));
-        return true;
+        if (this->Has(index))
+            SetBackground(this->items[index], color);
+        return this->Has(index);
     }
 
     bool SetItemTextColor(int index, const char* control, Color color) override
     {
-        void* child = index >= 0 && index < this->Count() && control ? functions.findChildByName(this->items[index], control, true) : nullptr;
-        if (!child)
-            return false;
-        Virtual<Functions::FrameInt>(child, layout.setFgColor)(child, NativeColor(color));
-        return true;
+        return this->Has(index) && SetChildTextColor(this->items[index], control, color);
     }
 
     int Selected() override
@@ -482,7 +444,7 @@ public:
 
     void Select(int index) override
     {
-        if (index >= 0 && index < this->Count())
+        if (this->Has(index))
             Virtual<Functions::ListSelectItem>(this->list, layout.listSelectItem)(this->list, static_cast<unsigned short>(index), 1, true, true, false);
     }
 
@@ -493,11 +455,7 @@ public:
             this->Select(static_cast<int>(found - this->items.begin()));
     }
 
-    void ApplyScheme()
-    {
-        Virtual<Functions::FrameBool>(this->list, layout.listSetScrollBarVisible)(this->list, true);
-        Virtual<Functions::FrameBool>(this->list, layout.listSetScrollArrowsVisible)(this->list, false);
-    }
+    void ApplyScheme() { ShowScrollBar(this->list); }
 
 private:
     struct PendingAvatar {
@@ -505,6 +463,8 @@ private:
         std::string control;
         uint64_t steamId;
     };
+
+    bool Has(int index) { return index >= 0 && index < this->Count(); }
 
     bool LoadAvatar(void* item, const char* control, uint64_t steamId)
     {
@@ -535,11 +495,6 @@ private:
     std::vector<uint64_t> avatars; // references this list holds in the avatar cache
     std::vector<PendingAvatar> pendingAvatars;
 };
-
-void SelectItem(ListImpl* list, void* item)
-{
-    list->Select(item);
-}
 
 // ButtonCode_t values that move a grid's selection within a row: the arrow keys, and the first
 // controller's d-pad and left stick. The list itself handles Up and Down.
@@ -578,9 +533,8 @@ public:
     {
         if (!ValidName(resource, MaxResourceLength))
             return -1;
-        auto create = Virtual<Functions::CreateControlByName>(this->frame, layout.createControlByName);
         if (this->Count() % this->columns == 0) {
-            void* row = create(this->frame, "EditablePanel");
+            void* row = Virtual<Functions::CreateControlByName>(this->frame, layout.createControlByName)(this->frame, "EditablePanel");
             if (!row)
                 return -1;
             Virtual<Functions::ListAddItem>(this->list, layout.listAddItem)(this->list, row, true);
@@ -588,15 +542,9 @@ public:
             gridRows[row] = this;
             this->rows.push_back(row);
         }
-        void* tile = create(this->frame, "EditablePanel");
+        void* tile = CreateItem(this->frame, resource);
         if (!tile)
             return -1;
-
-        char path[64];
-        std::snprintf(path, sizeof(path), "Resource/UI/BaseModUI/%s.res", resource);
-        functions.utlStringSet(&Field<char>(tile, layout.panelName), resource);
-        Virtual<Functions::FrameBool>(tile, layout.setProportional)(tile, true);
-        Virtual<Functions::LoadControlSettings>(tile, layout.loadControlSettings)(tile, path, nullptr, nullptr, nullptr);
         void* panelInterface = *functions.panelInterface;
         Virtual<Functions::PanelSetParent>(panelInterface, layout.panelSetParent)(panelInterface, VPanelOf(tile), VPanelOf(this->rows.back()));
         PatchMouseTree(tile);
@@ -609,12 +557,12 @@ public:
 
     bool SetItemText(int index, const char* control, const char* text) override
     {
-        return index >= 0 && index < this->Count() && SetChildText(this->tiles[index], control, text);
+        return this->Has(index) && SetChildText(this->tiles[index], control, text);
     }
 
     bool SetItemImage(int index, const char* control, const char* image) override
     {
-        void* child = index >= 0 && index < this->Count() && control && image ? functions.findChildByName(this->tiles[index], control, true) : nullptr;
+        void* child = this->Has(index) && control && image ? functions.findChildByName(this->tiles[index], control, true) : nullptr;
         if (!child || std::strcmp(ClassName(child), ImagePanelClassName) != 0)
             return false;
         Virtual<Functions::ImagePanelSetImageName>(child, layout.imagePanelSetImageName)(child, image);
@@ -623,26 +571,21 @@ public:
 
     bool SetItemBackground(int index, Color color) override
     {
-        if (index < 0 || index >= this->Count())
-            return false;
-        Virtual<Functions::FrameInt>(this->tiles[index], layout.setBgColor)(this->tiles[index], NativeColor(color));
-        return true;
+        if (this->Has(index))
+            SetBackground(this->tiles[index], color);
+        return this->Has(index);
     }
 
     bool SetItemTextColor(int index, const char* control, Color color) override
     {
-        void* child = index >= 0 && index < this->Count() && control ? functions.findChildByName(this->tiles[index], control, true) : nullptr;
-        if (!child)
-            return false;
-        Virtual<Functions::FrameInt>(child, layout.setFgColor)(child, NativeColor(color));
-        return true;
+        return this->Has(index) && SetChildTextColor(this->tiles[index], control, color);
     }
 
-    int Selected() override { return this->selected >= 0 && this->selected < this->Count() ? this->selected : -1; }
+    int Selected() override { return this->Has(this->selected) ? this->selected : -1; }
 
     void Select(int index) override
     {
-        if (index < 0 || index >= this->Count())
+        if (!this->Has(index))
             return;
         this->selected = index;
         // Selecting the row scrolls it into view and moves focus there for Up and Down.
@@ -689,13 +632,11 @@ public:
             this->owner->OnItemActivated(this->name.c_str(), index);
     }
 
-    void ApplyScheme()
-    {
-        Virtual<Functions::FrameBool>(this->list, layout.listSetScrollBarVisible)(this->list, true);
-        Virtual<Functions::FrameBool>(this->list, layout.listSetScrollArrowsVisible)(this->list, false);
-    }
+    void ApplyScheme() { ShowScrollBar(this->list); }
 
 private:
+    bool Has(int index) { return index >= 0 && index < this->Count(); }
+
     // Packs the row's tiles left to right at their own widths, and sizes the row around them.
     void LayoutRow(int row)
     {
@@ -737,9 +678,63 @@ private:
     int selected = -1;
 };
 
-void ClickGridTile(GridImpl* grid, void* tile, bool doubleClick)
+MENUS_DETOUR(void, PanelPaint)
 {
-    grid->Click(tile, doubleClick);
+    auto original = paintVtables.find(*reinterpret_cast<uintptr_t**>(thisptr));
+    if (original != paintVtables.end())
+        reinterpret_cast<_PanelPaint>(original->second)(thisptr);
+    auto selector = selectors.find(thisptr);
+    if (selector != selectors.end())
+        selector->second->Paint();
+}
+
+// A left click on one of our panels, or anything inside a list item or grid tile. Returns false
+// if it wasn't ours. vgui sends the second press of a double-click to OnMouseDoublePressed.
+bool HandleClick(void* clicked, bool doubleClick)
+{
+    auto selector = selectors.find(clicked);
+    if (selector != selectors.end()) {
+        selector->second->Click();
+        return true;
+    }
+    void* panel = clicked;
+    void* child = nullptr;
+    for (int depth = 0; panel && depth < 4; ++depth) {
+        auto owner = listItems.find(panel);
+        if (owner != listItems.end()) {
+            owner->second->Select(panel);
+            return true;
+        }
+        // A grid row's children are its tiles. A double-click activates the tile, and the panel
+        // can close itself in response, so nothing may be touched afterwards.
+        auto grid = gridRows.find(panel);
+        if (grid != gridRows.end()) {
+            if (child)
+                grid->second->Click(child, doubleClick);
+            return true;
+        }
+        child = panel;
+        panel = Virtual<Functions::PanelGetParent>(panel, layout.getParent)(panel);
+    }
+    return false;
+}
+
+MENUS_DETOUR(void, ItemOnMousePressed, int code)
+{
+    if (code == MouseLeft && HandleClick(thisptr, false))
+        return;
+    auto original = mouseVtables.find(*reinterpret_cast<uintptr_t**>(thisptr));
+    if (original != mouseVtables.end())
+        reinterpret_cast<_ItemOnMousePressed>(original->second)(thisptr, code);
+}
+
+MENUS_DETOUR(void, ItemOnMouseDoublePressed, int code)
+{
+    if (code == MouseLeft && HandleClick(thisptr, true))
+        return;
+    auto original = doubleVtables.find(*reinterpret_cast<uintptr_t**>(thisptr));
+    if (original != doubleVtables.end())
+        reinterpret_cast<_ItemOnMouseDoublePressed>(original->second)(thisptr, code);
 }
 
 // What a panel's helpers (Panel::Close and so on) call into.
@@ -1226,11 +1221,9 @@ List* FrameImpl::CreateList(const char* name)
     auto found = this->frame ? MenuSystem::instances.find(this->frame) : MenuSystem::instances.end();
     if (found == MenuSystem::instances.end() || found->second.opened || !ValidName(name, 63))
         return nullptr;
-    void* list = functions.allocate(layout.listSize);
+    void* list = CreateNativeList(this->frame, name);
     if (!list)
         return nullptr;
-    // Same arguments the stock leaderboard uses for its lists.
-    functions.listConstructor(list, this->frame, name, 5, true);
     ListImpl* wrapper = new ListImpl(this->frame, list);
     found->second.lists.push_back(wrapper);
     return wrapper;
@@ -1241,10 +1234,9 @@ Grid* FrameImpl::CreateGrid(const char* name, int columns)
     auto found = this->frame ? MenuSystem::instances.find(this->frame) : MenuSystem::instances.end();
     if (found == MenuSystem::instances.end() || found->second.opened || !ValidName(name, 63) || columns < 1)
         return nullptr;
-    void* list = functions.allocate(layout.listSize);
+    void* list = CreateNativeList(this->frame, name);
     if (!list)
         return nullptr;
-    functions.listConstructor(list, this->frame, name, 5, true);
     GridImpl* grid = new GridImpl(found->second.panel, name, this->frame, list, columns);
     found->second.grids.push_back(grid);
     return grid;

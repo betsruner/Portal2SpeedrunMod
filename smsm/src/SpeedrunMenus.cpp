@@ -8,13 +8,24 @@
 
 #include "Cheats.hpp"
 #include "Leaderboards.hpp"
-#include "Modules/Console.hpp"
 #include "Modules/Engine.hpp"
 
 namespace {
-// vgui ButtonCode_t for the controller A button (and the second controller's), which the footer's primary button sends.
+// vgui ButtonCode_t for the controller A button and the Steam Controller's, which the footer's
+// primary button also sends.
 constexpr int KeyXButtonA = 114;
-constexpr int KeyXButtonA2 = 306;
+constexpr int KeySteamControllerA = 306;
+
+bool IsConfirmKey(int code)
+{
+    return code == KeyXButtonA || code == KeySteamControllerA;
+}
+
+template <typename T>
+Menus::Panel* Make()
+{
+    return new T();
+}
 
 // Single player challenge mode maps, by chapter, with their board.portal2.sr chamber (Steam leaderboard) ids.
 struct ChallengeMap {
@@ -79,20 +90,20 @@ struct Chapter {
     int count;
 };
 
-#define CHAPTER(maps) { maps, static_cast<int>(sizeof(maps) / sizeof(maps[0])) }
+#define CHAPTER(maps) { maps, static_cast<int>(std::size(maps)) }
 const Chapter Chapters[] = {
     CHAPTER(ChapterOneMaps), CHAPTER(ChapterTwoMaps), CHAPTER(ChapterThreeMaps),
     CHAPTER(ChapterFourMaps), CHAPTER(ChapterFiveMaps), CHAPTER(ChapterSixMaps),
     CHAPTER(ChapterSevenMaps), CHAPTER(ChapterEightMaps), CHAPTER(ChapterNineMaps),
 };
-constexpr int ChapterCount = static_cast<int>(sizeof(Chapters) / sizeof(Chapters[0]));
+constexpr int ChapterCount = static_cast<int>(std::size(Chapters));
 // board.portal2.sr returns the top 500; building that many rows at once hitches the menu.
 constexpr int MaxLeaderboardEntries = 200;
 
 // Leaderboard categories. Any% is what board.portal2.sr serves; the rest are mock-ups until real
 // category data exists (see MockCategory).
 const char* const Categories[] = { "ANY%", "INBOUNDS", "NO SLA", "GLITCHLESS" };
-constexpr int CategoryCount = static_cast<int>(sizeof(Categories) / sizeof(Categories[0]));
+constexpr int CategoryCount = static_cast<int>(std::size(Categories));
 
 // Fake board for a mock category: the Any% runners, some of them dropped, with slower times.
 std::vector<Leaderboards::Entry> MockCategory(const std::vector<Leaderboards::Entry>& anyPercent, int category)
@@ -116,6 +127,18 @@ constexpr Menus::Color SelectedRowColor { 0, 0, 0, 240 };
 constexpr Menus::Color SelectedTextColor { 240, 240, 240, 255 };
 constexpr Menus::Color RowColor { 0, 0, 0, 0 };
 constexpr Menus::Color TextColor { 0, 0, 0, 255 };
+
+// Colors a Menus::List or Menus::Grid like the stock map list. Runtime colors don't survive a
+// scheme reload, so this runs every tick.
+template <typename Items>
+void HighlightSelected(Items* items, const char* label)
+{
+    const int selected = items->Selected();
+    for (int i = 0; i < items->Count(); ++i) {
+        items->SetItemBackground(i, i == selected ? SelectedRowColor : RowColor);
+        items->SetItemTextColor(i, label, i == selected ? SelectedTextColor : TextColor);
+    }
+}
 
 // Challenge Mode: chapter selector, the chapter's maps, and the selected map's board.portal2.sr leaderboard.
 class ChallengeModePanel : public Menus::Panel {
@@ -154,7 +177,7 @@ public:
 
     bool OnKeyCodePressed(int code) override
     {
-        if (code != KeyXButtonA && code != KeyXButtonA2)
+        if (!IsConfirmKey(code))
             return false;
         const int map = this->maps ? this->maps->Selected() : -1;
         if (map >= 0) {
@@ -175,11 +198,7 @@ public:
             this->ShowLeaderboard(selected);
         if (this->shownMap >= 0 && this->filledMap != this->shownMap)
             this->TryFillLeaderboard();
-
-        for (int i = 0; i < this->maps->Count(); ++i) {
-            this->maps->SetItemBackground(i, i == selected ? SelectedRowColor : RowColor);
-            this->maps->SetItemTextColor(i, "LblMapName", i == selected ? SelectedTextColor : TextColor);
-        }
+        HighlightSelected(this->maps, "LblMapName");
     }
 
 private:
@@ -292,7 +311,7 @@ public:
 
     bool OnKeyCodePressed(int code) override
     {
-        if (code != KeyXButtonA && code != KeyXButtonA2)
+        if (!IsConfirmKey(code))
             return false;
         if (this->grid)
             this->Start(this->grid->Selected());
@@ -306,13 +325,8 @@ public:
 
     void OnTick() override
     {
-        if (!this->grid)
-            return;
-        const int selected = this->grid->Selected();
-        for (int i = 0; i < this->grid->Count(); ++i) {
-            this->grid->SetItemBackground(i, i == selected ? SelectedRowColor : RowColor);
-            this->grid->SetItemTextColor(i, "LblCategory", i == selected ? SelectedTextColor : TextColor);
-        }
+        if (this->grid)
+            HighlightSelected(this->grid, "LblCategory");
     }
 
 private:
@@ -362,38 +376,16 @@ public:
     }
 };
 
-// Placeholder until the real panels exist: logs its lifecycle so menu navigation can be traced in the console.
-class PlaceholderPanel : public Menus::Panel {
-public:
-    explicit PlaceholderPanel(const char* id)
-        : id(id)
-    {
-    }
-
-    void OnOpen() override { console->Print("[menus] %s opened\n", this->id); }
-    void OnActivate() override { console->Print("[menus] %s activated\n", this->id); }
-    void OnClose() override { console->Print("[menus] %s closed\n", this->id); }
-
-private:
-    const char* id;
-};
-
-#define PLACEHOLDER(name) +[]() -> Menus::Panel* { return new PlaceholderPanel(name); }
 }
 
 void RegisterSpeedrunMenus(Menus::System* menus)
 {
-    // Main menu "Speedrun Mod" button -> pick Full Game or Challenge Mode.
-    menus->Register({ "p2sm_mode_select", "P2SMModeSelect", "Speedrun Mod", PLACEHOLDER("p2sm_mode_select") });
-    menus->Register({ "p2sm_full_game", "P2SMFullGame", "Full Game",
-        +[]() -> Menus::Panel* { return new FullGamePanel(); }, true, Menus::Layer::Page, "#L4D360UI_Start" });
+    // Main menu "Speedrun Mod" button -> pick Full Game or Challenge Mode. Its buttons only open
+    // other panels, which .res commands do by themselves.
+    menus->Register({ "p2sm_mode_select", "P2SMModeSelect", "Speedrun Mod", Make<Menus::Panel> });
+    menus->Register({ "p2sm_full_game", "P2SMFullGame", "Full Game", Make<FullGamePanel>, true, Menus::Layer::Page, "#L4D360UI_Start" });
     // The stock leaderboard's strings live in portal2_dlc1, which the mod doesn't search, so use plain text.
-    menus->Register({ "p2sm_challenge_mode", "P2SMChallengeMode", "Leaderboards",
-        +[]() -> Menus::Panel* { return new ChallengeModePanel(); }, true, Menus::Layer::Page, "#PORTAL2_PlaySelectedMap" });
+    menus->Register({ "p2sm_challenge_mode", "P2SMChallengeMode", "Leaderboards", Make<ChallengeModePanel>, true, Menus::Layer::Page, "#PORTAL2_PlaySelectedMap" });
     // Options -> Speedrun Mod settings.
-    menus->Register({ "p2sm_settings", "P2SMSettings", "Speedrun Mod", +[]() -> Menus::Panel* { return new SettingsPanel(); } });
-
-    // Navigation tests: a third level of pages and a popup.
-    menus->Register({ "p2sm_test_page", "P2SMTestPage", "Third Page", PLACEHOLDER("p2sm_test_page") });
-    menus->Register({ "p2sm_test_popup", "P2SMTestPopup", "Popup", PLACEHOLDER("p2sm_test_popup"), false, Menus::Layer::Popup });
+    menus->Register({ "p2sm_settings", "P2SMSettings", "Speedrun Mod", Make<SettingsPanel> });
 }

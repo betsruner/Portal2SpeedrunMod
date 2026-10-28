@@ -45,10 +45,13 @@ struct Layout {
     int setBgColor;
     int setFgColor;
     int onMousePressed;
+    int onMouseDoublePressed; // the second press of a double-click comes here instead of OnMousePressed
     int paint;
     // ISteamFriends017
     int steamFriendsRequestUserInformation;
     // vgui::IPanel
+    int panelSetPos;
+    int panelSetSize;
     int panelGetSize;
     int panelGetAbsPos;
     int panelSetParent;
@@ -67,7 +70,8 @@ struct Layout {
     int loadControlSettings;
     int createControlByName;
     int labelSetText;
-    int imagePanelSetImage; // SetImage(IImage*)
+    int imagePanelSetImage;     // SetImage(IImage*)
+    int imagePanelSetImageName; // SetImage(const char*), relative to materials/vgui/
     // BaseModUI::GenericPanelList
     int listSize;
     int listSelectedItem; // Panel* of the selected item
@@ -76,10 +80,6 @@ struct Layout {
     int listSelectItem;
     int listSetScrollBarVisible;
     int listSetScrollArrowsVisible;
-    int imagePanelSetImageName; // SetImage(const char*), relative to materials/vgui/
-    int panelSetPos;            // vgui::IPanel
-    int panelSetSize;           // vgui::IPanel
-    int onMouseDoublePressed;   // vgui::Panel; the second press of a double-click comes here instead of OnMousePressed
 };
 
 struct Functions {
