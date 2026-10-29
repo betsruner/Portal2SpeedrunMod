@@ -61,3 +61,5 @@ You'll need:
 make -j$(nproc)
 make -C ../custommenus -j$(nproc)
 ```
+
+Any newer multilib `g++` works too: add `CXX=g++` to both commands.

@@ -30,10 +30,11 @@ constexpr const char* AccessAvatarImageSignature = "55 8B EC 83 EC 14 83 7D 10 0
 constexpr const char* SetAvatarXuidSignature = "55 8B EC 0F 57 C0 83 EC 0C 53 56 8B F1 C6 46 1C 00 F3 0F 11 46 20 A1 ? ? ? ? 83 78 08 00 57";
 constexpr int SetAvatarXuidContextOffset = 0x17;
 constexpr int HandleGetVguiOffset = 10; // "8B 0D <g_pVGui>" in PHandle::Get
-constexpr int FindChildPanelInterfaceOffset = 0x15;
-constexpr int FindChildModuleNameCallOffset = 0x66;
 constexpr const char* UtlStringSetSignature = "55 8B EC 56 57 8B 7D 08 8B F1 85 FF 74 1B 57 E8 ? ? ? ? 83 C4 04 40 50 57 8B CE E8 ? ? ? ? 5F 8B C6 5E 5D C2 04 00 33 C0 50 57 8B CE E8";
+// FindChildByName starts with "mov ebx, [g_pVGuiPanel]" and calls GetControlsModuleName.
 constexpr const char* FindChildByNameSignature = "55 8B EC 83 EC 10 53 56 89 4D F8 C7 45 FC 00 00 00 00 57 8B 1D ? ? ? ? 85 DB 74 24 8B 41 04 8B 50 04 8B 44 0A 04 8B 33 8D 4C 0A 04 8B 10 FF D2 50 8B 46 44 8B CB FF D0 8B 1D ? ? ? ? EB 02 33 C0 39 45 FC 0F 8D";
+constexpr int PanelInterfaceOffset = 0x15;
+constexpr int ModuleNameCallOffset = 0x66;
 
 constexpr Layout PlatformLayout {
     // CBaseModFrame
@@ -56,30 +57,60 @@ constexpr Layout PlatformLayout {
     548, 504, 183, 187, 188, 195, 196,
 };
 #else
-// Linux values carried over from the first prototype. The vtable indices are the Windows ones
-// shifted by 29 and the CBaseModPanel fields past m_Frames are unverified, so the menu system
-// stays disabled on Linux until someone checks them against client.so.
-constexpr const char* GetPanelSingletonSignature = "A1 ? ? ? ? C3 8D B4 26 ? ? ? ? 8D 76 ? A1 ? ? ? ? C3 8D B4 26 ? ? ? ? 8D 76 ? C3 90 8D B4 26 ? ? ? ? 8D B4 26 ? ? ? ? 8B 44 24 ?";
-constexpr const char* AllocateSignature = "83 EC ? A1 ? ? ? ? 8B 10 FF 74 24 ? 50 FF 12 83 C4 ? C3 8D B4 26 ? ? ? ? 8D 74 26 ? A1 ? ? ? ? 8B 4C 24 ? 8B 10 89 44 24 ? 89 4C 24 ? FF 62 ? 8D B4 26 ? ? ? ? 8D 76 ? 83 EC ? A1 ? ? ? ? 8B 10 FF 74 24 ? 50 FF 52 ? 83 C4 ? C3 8D B4 26 ? ? ? ? 8D 76 ? 83 EC";
-constexpr const char* FrameConstructorSignature = "55 89 E5 57 56 53 83 EC ? 8B 5D ? 8B 45 ? 8B 7D ? C7 03 ? ? ? ? 6A";
-constexpr const char* OpenWindowSignature = "55 66 0F EF C0 89 E5 57 56 53 83 EC ? 8B 75";
-constexpr const char* HandleGetSignature = "57 56 53 8B 44 24 ? 8B 00";
-constexpr const char* HandleSetSignature = "57 56 53 8B 5C 24 ? 85 DB 74 ? 8B 35";
-constexpr const char* SetDeleteSelfOnCloseSignature = "8B 44 24 ? 8B 54 24 ? 88 90 ? ? ? ? C3 90 83 EC";
-constexpr const char* FooterSetButtonsSignature = "8B 54 24 ? 8B 4C 24 ? 6B 44 24 ? ? 01 D0 89 88 ? ? ? ? 8B 4C 24 ? 89 88 ? ? ? ? 8B 4C 24";
-constexpr const char* FooterSetButtonTextSignature = "55 57 56 53 83 EC ? 8B 5C 24 ? 8B 7C 24 ? 8B 44 24 ? 8B 6C 24 ? 8B 74 24";
-constexpr const char* ReleaseActiveMenuControlSignature = "A1 ? ? ? ? 85 C0 74 ? 83 EC ? 8B 10 50 FF 92 ? ? ? ? 83 C4 ? 84 C0 75 ? 83 C4";
+// client.so is built without -fPIC, so globals are absolute addresses the loader patches at load
+// time (text relocations); the signatures leave those bytes as wildcards.
+constexpr const char* GetPanelSingletonSignature = "A1 ? ? ? ? C3 8D B4 26 00 00 00 00 8D 76 00 A1 ? ? ? ? C3 8D B4 26 00 00 00 00 8D 76 00 C3";
+// There are two identical copies; either does.
+constexpr const char* AllocateSignature = "83 EC 14 A1 ? ? ? ? 8B 10 FF 74 24 18 50 FF 12 83 C4 1C C3";
+// The complete object constructor, which takes no VTT. Its arguments stop at the Cancel button flag.
+constexpr const char* FrameConstructorSignature = "55 89 E5 57 56 53 83 EC 24 8B 5D 08 8B 45 14";
+constexpr const char* SetDialogTitleSignature = "55 57 56 53 83 EC 4C 8B 74 24 64 85 F6 0F 84 ? ? ? ? A1 ? ? ? ? 83 EC 08 8B 10 56 50 FF 52 28 8B 4C 24 70 83 C4 10 8D 99 A0 02 00 00";
+constexpr const char* OpenWindowSignature = "55 66 0F EF C0 89 E5 57 56 53 83 EC 3C";
+constexpr const char* HandleGetSignature = "57 56 53 8B 44 24 10 8B 00";
+constexpr const char* HandleSetSignature = "57 56 53 8B 5C 24 14 85 DB 74 35";
+constexpr const char* SetDeleteSelfOnCloseSignature = "8B 44 24 04 8B 54 24 08 88 90 24 02 00 00 C3 90 83 EC 14";
+constexpr const char* FooterSetButtonsSignature = "8B 54 24 04 8B 4C 24 0C 6B 44 24 10 78";
+constexpr const char* FooterSetButtonTextSignature = "55 57 56 53 83 EC 0C 8B 5C 24 24 8B 7C 24 20 8B 44 24 28";
+constexpr const char* ReleaseActiveMenuControlSignature = "A1 ? ? ? ? 85 C0 74 3F 83 EC 18 8B 10 50 FF 92 8C 00 00 00";
+// Same arguments as on Windows, minus the trailing most-derived flag. Found by its field setup too.
+constexpr const char* ListConstructorSignature = "C7 83 68 01 00 00 00 00 00 00 89 83 0C 02 00 00 31 C0";
+constexpr int ListConstructorSignatureOffset = -0xBE;
+constexpr const char* HybridButtonSetCurrentSelectionSignature = "55 57 56 53 83 EC 0C 8B 7C 24 20 8B 6C 24 24 8B 87 3C 02 00 00";
+constexpr const char* GetUIGameDataSignature = "55 89 E5 56 53 8B 1D ? ? ? ? 85 DB 74 11 8D 65 F8 89 D8 5B 5E 5D C3 8D B4 26 00 00 00 00 90 80 3D ? ? ? ? 00 75 E6 83 EC 0C 68 64 01 00 00 E8";
+constexpr const char* AccessAvatarImageSignature = "55 89 E5 57 56 53 83 EC 3C F3 0F 7E 45 0C";
+constexpr const char* SetAvatarXuidSignature = "57 31 D2 56 53 83 EC 10 A1 ? ? ? ?";
+constexpr int SetAvatarXuidContextOffset = 9;
+constexpr int HandleGetVguiOffset = 0x10; // "8B 15 <g_pVGui>" in PHandle::Get
+constexpr const char* UtlStringSetSignature = "57 56 53 8B 7C 24 14 8B 74 24 10 85 FF";
+// FindChildByName gets each child through Panel::GetChild, which loads g_pVGuiPanel and calls
+// GetControlsModuleName.
+constexpr const char* FindChildByNameSignature = "55 57 56 53 31 DB 83 EC 0C 8B 74 24 20 0F B6 6C 24 28";
+constexpr int FindChildGetChildCallOffset = 0x31;
+constexpr int PanelInterfaceOffset = 9;
+constexpr int ModuleNameCallOffset = 0x1A;
 
+// GCC gives every vgui::Panel two destructor slots and keeps overloads in declaration order, so
+// most indices sit 29 above MSVC's, but not all of them. Panel fields sit 4 lower, with no vbptr.
+// The interfaces deriving IBaseInterface are one above, for its second destructor slot.
 constexpr Layout PlatformLayout {
+    // CBaseModFrame
     0xC68, 293, 0x270, 0x274, 0xAFC,
-    0x2E0, -1, -1, 0x410, 0x52C,
+    // CBaseModPanel
+    0x2E0, 0x41C, 0x466, 0x410, 0x52C,
+    // CBaseModFrame virtuals
     34, 35, 89, 97, 122, 135, 236, 243, 282, 283,
-    -1, -1, -1, -1, -1, -1, -1,
-    -1,
-    -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1,
+    // vgui::Panel
+    0x50, 39, 60, 61, 106, 107, 129,
+    // ISteamFriends017
+    37,
+    // vgui::IPanel
+    3, 5, 6, 11, 17, 18, 19, 56,
+    // ISurface, IInput, IScheme
+    13, 15, 72, 160, 77, 9, 4,
+    // EditablePanel / Label / ImagePanel virtuals
+    212, 218, 212, 212, 213,
+    // GenericPanelList
+    0x218, 0x1F4, 212, 216, 217, 224, 225,
 };
 #endif
 
@@ -94,9 +125,6 @@ bool Find(const char* module, const char* signature, T& out, int offset = 0)
 bool Resolve(const char* clientModule)
 {
     layout = PlatformLayout;
-#ifndef _WIN32
-    return false;
-#else
     const bool found = Find(clientModule, GetPanelSingletonSignature, functions.getPanelSingleton)
         && Find(clientModule, AllocateSignature, functions.allocate)
         && Find(clientModule, FrameConstructorSignature, functions.frameConstructor)
@@ -117,10 +145,15 @@ bool Resolve(const char* clientModule)
     if (!found)
         return false;
 
-    // FindChildByName starts with "mov ebx, [g_pVGuiPanel]" and calls GetControlsModuleName.
+    // Both read out of the code that walks a panel's children.
     const auto findChild = reinterpret_cast<uintptr_t>(functions.findChildByName);
-    functions.panelInterface = *reinterpret_cast<void***>(findChild + FindChildPanelInterfaceOffset);
-    functions.controlsModuleName = Support::ReadRelative<Functions::ControlsModuleName>(findChild + FindChildModuleNameCallOffset);
+#ifdef _WIN32
+    const uintptr_t children = findChild;
+#else
+    const uintptr_t children = Support::ReadRelative(findChild + FindChildGetChildCallOffset);
+#endif
+    functions.panelInterface = *reinterpret_cast<void***>(children + PanelInterfaceOffset);
+    functions.controlsModuleName = Support::ReadRelative<Functions::ControlsModuleName>(children + ModuleNameCallOffset);
 
     // Without it, avatars of players who aren't Steam friends just never load.
     const uintptr_t setAvatar = Support::Scan(clientModule, SetAvatarXuidSignature);
@@ -130,7 +163,6 @@ bool Resolve(const char* clientModule)
     functions.input = Support::GetInterface(MENUS_MODULE("vgui2"), "VGUI_Input005");
     functions.vgui = *reinterpret_cast<void***>(reinterpret_cast<uintptr_t>(functions.handleGet) + HandleGetVguiOffset);
     return functions.panelInterface && functions.controlsModuleName && functions.surface && functions.input && functions.vgui;
-#endif
 }
 
 }

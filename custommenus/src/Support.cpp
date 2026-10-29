@@ -45,9 +45,32 @@ CodeRange FindCode(const char* module)
     return { base, base + info.SizeOfImage };
 }
 #else
+// Calls back with the loaded module whose file name is module, until the callback returns nonzero.
+template <typename Callback>
+void ForModule(const char* module, Callback callback)
+{
+    struct Search {
+        const char* module;
+        Callback& callback;
+    } search { module, callback };
+    dl_iterate_phdr([](dl_phdr_info* info, size_t, void* data) {
+        auto search = static_cast<Search*>(data);
+        const char* slash = std::strrchr(info->dlpi_name, '/');
+        return std::strcmp(slash ? slash + 1 : info->dlpi_name, search->module) ? 0 : search->callback(info);
+    },
+        &search);
+}
+
+// The game loads its modules by full path and they have no soname, so dlopen won't find them by
+// file name alone.
 void* OpenModule(const char* module)
 {
-    return dlopen(module, RTLD_NOLOAD | RTLD_NOW);
+    void* handle = nullptr;
+    ForModule(module, [&](dl_phdr_info* info) {
+        handle = dlopen(info->dlpi_name, RTLD_NOLOAD | RTLD_NOW);
+        return 1;
+    });
+    return handle;
 }
 
 void* Symbol(void* handle, const char* name)
@@ -62,26 +85,18 @@ void CloseModule(void* handle)
 
 CodeRange FindCode(const char* module)
 {
-    struct Search {
-        const char* module;
-        CodeRange range;
-    } search { module, {} };
-    dl_iterate_phdr([](dl_phdr_info* info, size_t, void* data) {
-        auto search = static_cast<Search*>(data);
-        const char* slash = std::strrchr(info->dlpi_name, '/');
-        if (std::strcmp(slash ? slash + 1 : info->dlpi_name, search->module))
-            return 0;
+    CodeRange range;
+    ForModule(module, [&](dl_phdr_info* info) {
         for (int i = 0; i < info->dlpi_phnum; ++i) {
             if (info->dlpi_phdr[i].p_flags & PF_X) {
-                search->range.start = info->dlpi_addr + info->dlpi_phdr[i].p_vaddr;
-                search->range.end = search->range.start + info->dlpi_phdr[i].p_memsz;
+                range.start = info->dlpi_addr + info->dlpi_phdr[i].p_vaddr;
+                range.end = range.start + info->dlpi_phdr[i].p_memsz;
                 return 1;
             }
         }
         return 0;
-    },
-        &search);
-    return search.range;
+    });
+    return range;
 }
 #endif
 
@@ -208,15 +223,15 @@ void Warning(const char* format, ...)
 VtableHook::VtableHook(void* object, int size)
     : object(static_cast<uintptr_t**>(object))
     , original(*static_cast<uintptr_t**>(object))
-    , copy(new uintptr_t[size + 1])
+    , copy(new uintptr_t[size + Prefix])
 {
-    std::memcpy(this->copy, this->original - 1, (size + 1) * sizeof(uintptr_t));
-    *this->object = this->copy + 1;
+    std::memcpy(this->copy, this->original - Prefix, (size + Prefix) * sizeof(uintptr_t));
+    *this->object = this->copy + Prefix;
 }
 
 VtableHook::~VtableHook()
 {
-    if (this->object && *this->object == this->copy + 1)
+    if (this->object && *this->object == this->copy + Prefix)
         *this->object = this->original;
     delete[] this->copy;
 }

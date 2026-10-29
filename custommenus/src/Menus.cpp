@@ -95,18 +95,25 @@ void ReleasePendingAvatars()
     }
 }
 
+#ifdef _WIN32
 constexpr const char* HybridButtonClassName = ".?AVBaseModHybridButton@BaseModUI@@";
+constexpr const char* ImagePanelClassName = ".?AVImagePanel@vgui@@";
+#else
+constexpr const char* HybridButtonClassName = "N9BaseModUI19BaseModHybridButtonE";
+constexpr const char* ImagePanelClassName = "N4vgui10ImagePanelE";
+#endif
 
-// The class name MSVC's RTTI records for a polymorphic object, like HybridButtonClassName.
+// The class name the RTTI records for a polymorphic object, like HybridButtonClassName.
 const char* ClassName(void* object)
 {
+    const uintptr_t rtti = (*static_cast<uintptr_t**>(object))[-1];
 #ifdef _WIN32
     // The vtable is preceded by the RTTI complete object locator, whose fourth field points to
     // the type descriptor; the decorated name starts 8 bytes into it.
-    auto locator = reinterpret_cast<const uint32_t*>((*static_cast<uintptr_t**>(object))[-1]);
-    return reinterpret_cast<const char*>(locator[3]) + 8;
+    return reinterpret_cast<const char*>(reinterpret_cast<const uint32_t*>(rtti)[3]) + 8;
 #else
-    return "";
+    // The vtable is preceded by the std::type_info, which holds the mangled name after its vtable.
+    return reinterpret_cast<const char* const*>(rtti)[1];
 #endif
 }
 
@@ -504,7 +511,6 @@ constexpr int KeyXButtonRight = 243;
 constexpr int KeyXButtonLeft = 245;
 constexpr int KeyXStick1Right = 258;
 constexpr int KeyXStick1Left = 259;
-constexpr const char* ImagePanelClassName = ".?AVImagePanel@vgui@@";
 
 // Each list item is a row: a bare EditablePanel the tiles are reparented into and positioned in.
 class GridImpl final : public Grid {

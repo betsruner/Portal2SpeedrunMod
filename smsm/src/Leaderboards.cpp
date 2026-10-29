@@ -13,6 +13,9 @@
 #include <windows.h>
 #include <winhttp.h>
 #pragma comment(lib, "winhttp.lib")
+#else
+#include <dlfcn.h>
+#include <unistd.h>
 #endif
 
 namespace Leaderboards {
@@ -286,9 +289,84 @@ bool HttpGet(const std::wstring& path, std::string& body)
     return success;
 }
 #else
-bool HttpGet(const std::wstring&, std::string&)
+// libcurl, loaded at runtime rather than linked: the Steam runtime the game runs in ships a 32-bit one.
+struct Curl {
+    using EasyInit = void* (*)();
+    using EasySetOpt = int (*)(void* curl, int option, ...);
+    using EasyPerform = int (*)(void* curl);
+    using EasyGetInfo = int (*)(void* curl, int info, ...);
+    using EasyCleanup = void (*)(void* curl);
+
+    static constexpr int OptWriteData = 10001;
+    static constexpr int OptUrl = 10002;
+    static constexpr int OptCaInfo = 10065;
+    static constexpr int OptWriteFunction = 20011;
+    static constexpr int OptTimeout = 13;
+    static constexpr int OptConnectTimeout = 78;
+    static constexpr int OptNoSignal = 99;
+    static constexpr int InfoResponseCode = 0x200002;
+
+    EasyInit init = nullptr;
+    EasySetOpt setOpt = nullptr;
+    EasyPerform perform = nullptr;
+    EasyGetInfo getInfo = nullptr;
+    EasyCleanup cleanup = nullptr;
+    const char* caBundle = nullptr;
+
+    Curl()
+    {
+        void* library = dlopen("libcurl.so.4", RTLD_NOW);
+        if (!library)
+            library = dlopen("libcurl-gnutls.so.4", RTLD_NOW);
+        if (!library)
+            return;
+        init = reinterpret_cast<EasyInit>(dlsym(library, "curl_easy_init"));
+        setOpt = reinterpret_cast<EasySetOpt>(dlsym(library, "curl_easy_setopt"));
+        perform = reinterpret_cast<EasyPerform>(dlsym(library, "curl_easy_perform"));
+        getInfo = reinterpret_cast<EasyGetInfo>(dlsym(library, "curl_easy_getinfo"));
+        cleanup = reinterpret_cast<EasyCleanup>(dlsym(library, "curl_easy_cleanup"));
+        // The runtime's libcurl looks for certificates where Ubuntu keeps them; other distros don't.
+        for (const char* path : { "/etc/ssl/certs/ca-certificates.crt", "/etc/pki/tls/certs/ca-bundle.crt", "/etc/ssl/ca-bundle.pem", "/etc/ssl/cert.pem" }) {
+            if (access(path, R_OK) == 0) {
+                caBundle = path;
+                break;
+            }
+        }
+    }
+
+    bool Available() const { return init && setOpt && perform && getInfo && cleanup; }
+
+    static size_t Write(char* data, size_t size, size_t count, void* body)
+    {
+        static_cast<std::string*>(body)->append(data, size * count);
+        return size * count;
+    }
+};
+
+bool HttpGet(const std::wstring& path, std::string& body)
 {
-    return false;
+    static const Curl curl;
+    void* request = curl.Available() ? curl.init() : nullptr;
+    if (!request)
+        return false;
+    std::string url = "https://";
+    for (const wchar_t* c = Host; *c; ++c)
+        url += static_cast<char>(*c);
+    for (wchar_t c : path)
+        url += static_cast<char>(c);
+
+    curl.setOpt(request, Curl::OptUrl, url.c_str());
+    curl.setOpt(request, Curl::OptWriteFunction, &Curl::Write);
+    curl.setOpt(request, Curl::OptWriteData, &body);
+    curl.setOpt(request, Curl::OptConnectTimeout, 5L);
+    curl.setOpt(request, Curl::OptTimeout, 15L);
+    curl.setOpt(request, Curl::OptNoSignal, 1L); // it runs on the worker thread
+    if (curl.caBundle)
+        curl.setOpt(request, Curl::OptCaInfo, curl.caBundle);
+    long status = 0;
+    const bool success = curl.perform(request) == 0 && curl.getInfo(request, Curl::InfoResponseCode, &status) == 0 && status == 200;
+    curl.cleanup(request);
+    return success;
 }
 #endif
 

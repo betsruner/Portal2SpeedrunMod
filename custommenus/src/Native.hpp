@@ -178,11 +178,16 @@ inline T Virtual(void* object, int index)
     return reinterpret_cast<T>((*reinterpret_cast<void***>(object))[index]);
 }
 
-// A vgui::Panel's IClientPanel lives behind its virtual base; its first virtual is GetVPanel.
+// The first virtual of a vgui::Panel's IClientPanel is GetVPanel. MSVC puts the IClientPanel
+// behind the panel's virtual base; GCC makes it the primary base, at the start of the panel.
 inline uintptr_t VPanelOf(void* panel)
 {
+#ifdef _WIN32
     auto bytes = static_cast<unsigned char*>(panel);
     void* clientPanel = bytes + *reinterpret_cast<int*>(*reinterpret_cast<unsigned char**>(bytes + 4) + 4) + 4;
+#else
+    void* clientPanel = panel;
+#endif
     return Virtual<Functions::GetVPanel>(clientPanel, 0)(clientPanel);
 }
 

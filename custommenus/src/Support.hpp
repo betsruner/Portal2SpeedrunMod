@@ -75,16 +75,25 @@ public:
     void Hook(int index, T detour, U& original)
     {
         original = reinterpret_cast<U>(this->original[index]);
-        this->copy[index + 1] = reinterpret_cast<uintptr_t>(detour);
+        this->copy[index + Prefix] = reinterpret_cast<uintptr_t>(detour);
     }
 
     // The object was freed, so don't write its vtable back.
     void Forget() { this->object = nullptr; }
 
 private:
+    // The entries before the vtable that go with it. MSVC has the RTTI locator; GCC has the
+    // typeinfo, the offset to top, and before those the virtual base and virtual call offsets
+    // vgui::Panel's virtual base needs.
+#ifdef _WIN32
+    static constexpr int Prefix = 1;
+#else
+    static constexpr int Prefix = 8;
+#endif
+
     uintptr_t** object;
     uintptr_t* original;
-    uintptr_t* copy; // [0] is the RTTI pointer that precedes the vtable
+    uintptr_t* copy; // starts with the Prefix entries
 };
 
 }
