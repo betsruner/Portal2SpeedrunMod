@@ -70,8 +70,8 @@ inline void AngleVectors(const QAngle& angles, Vector* forward, Vector* right, V
 {
     float sr, sp, sy, cr, cp, cy;
 
-    SinCos(DEG2RAD(angles.x), &sy, &cy);
-    SinCos(DEG2RAD(angles.y), &sp, &cp);
+    SinCos(DEG2RAD(angles.y), &sy, &cy);
+    SinCos(DEG2RAD(angles.x), &sp, &cp);
     SinCos(DEG2RAD(angles.z), &sr, &cr);
 
     if (forward) {

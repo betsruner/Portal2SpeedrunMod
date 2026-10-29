@@ -19,10 +19,11 @@ function SLBS_Backup(){
         SLBS_initiated = true;
     }
 
+    //backups mode every time, since modes without parameters never mark them as changed
+    SLBS_mode = smsm.GetMode();
+
     if(smsm.AreModeParamsChanged()){
-        //backups mode and parameters
-        SLBS_mode = smsm.GetMode();
-        
+        //backups parameters
         local paramLen = smsm.GetModeParamsNumber();
         local params = {};
         for(local i=0;i<paramLen;i++){

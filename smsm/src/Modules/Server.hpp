@@ -17,6 +17,13 @@ public:
 
     //CGameMovement::ProcessMovement
     DECL_DETOUR(ProcessMovement, void* pPlayer, CMoveData* pMove);
+    //CPortalGameMovement::AirMove
+    DECL_DETOUR(AirMove);
+    //CPortalGameMovement::CheckJumpButton
+    DECL_DETOUR_T(bool, CheckJumpButton);
+
+    using _AirAccelerate = void(__func*)(void* thisptr, Vector* wishdir, float wishspeed, float accel);
+    using _TryPlayerMove = int(__func*)(void* thisptr, Vector* pFirstDest, void* pFirstTrace);
 
     using _UTIL_PlayerByIndex = void* (__cdecl*)(int index);
     _UTIL_PlayerByIndex UTIL_PlayerByIndex = nullptr;

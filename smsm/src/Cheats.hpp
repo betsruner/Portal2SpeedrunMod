@@ -6,6 +6,9 @@ class Cheats {
 public:
     void Init();
     void Shutdown();
+
+    void ApplyUltimateSpeedrun();
+    void RevertUltimateSpeedrun();
 };
 
 extern Command sm_mode;

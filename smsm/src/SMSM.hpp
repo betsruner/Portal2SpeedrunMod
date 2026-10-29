@@ -100,7 +100,8 @@ private:
 enum SMModes {
     Normal = 0,
     Fog = 1,
-    Celeste = 2
+    Celeste = 2,
+    UltimateSpeedrun = 7
 };
 
 extern SMSM smsm;

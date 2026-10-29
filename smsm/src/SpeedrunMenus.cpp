@@ -288,6 +288,7 @@ const FullGameCategory FullGameCategories[] = {
     { "Floor is Lava", "../srmod/menu_modes/floorislava", 5, "sp_a1_intro1" },
     { "Odyssey Mod", "../srmod/menu_modes/smo", 6, "sp_a1_intro1" },
     { "Fog% (beta)", "../srmod/menu_modes/fog", 1, "sp_a1_intro1" },
+    { "Ultimate Speedrun", "../srmod/menu_modes/normal", 7, "sp_a1_intro1" },
 };
 
 class FullGamePanel : public Menus::Panel {

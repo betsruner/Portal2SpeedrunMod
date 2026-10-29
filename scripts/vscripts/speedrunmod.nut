@@ -77,6 +77,7 @@ SPEEDRUN_MODES[2] <- ["default", "celeste"];
 SPEEDRUN_MODES[4] <- ["reverse"];
 SPEEDRUN_MODES[5] <- ["default", "floorislava"];
 SPEEDRUN_MODES[6] <- ["default", "smo"];
+SPEEDRUN_MODES[7] <- ["default"]; //Ultimate Speedrun, its movement changes are in SMSM
 
 //import proper scripts
 if(IsSMSMActive()){

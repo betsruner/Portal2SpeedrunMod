@@ -54,6 +54,13 @@ void Portal2::LoadOffsets()
     Think = 31; // CServerGameDLL
     m_hGroundEntity = 344; // CBaseEntity
     m_iHealth = 528; // CBaseEntity
+    AirAccelerate = 24; // CPortalGameMovement
+    AirMove = 25; // CPortalGameMovement
+    CheckJumpButton = 36; // CPortalGameMovement
+    TryPlayerMove = 39; // CPortalGameMovement
+    player = 4; // CGameMovement
+    mv = 8; // CGameMovement
+    m_vecBaseVelocity = 352; // CBasePlayer, CGameMovement::AirMove
     GetIServerEntity = 1; // CServerTools
     m_EntPtrArray = 61; // CServerTools::GetIServerEntity
     //CBaseEntityActivate = 37;

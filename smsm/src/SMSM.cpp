@@ -158,10 +158,17 @@ void SMSM::ForceAct5MenuBackground() {
 
 
 void SMSM::SetMode(int mode) {
+    const int previousMode = this->mode;
     this->mode = mode;
     //reset param table and other stuff when switching modes
     this->ResetModeVariables();
-    if (this->mode != mode)this->paramsChanged = true;
+    if (previousMode != mode)this->paramsChanged = true;
+
+    if (mode == UltimateSpeedrun) {
+        this->cheats->ApplyUltimateSpeedrun();
+    } else if (previousMode == UltimateSpeedrun) {
+        this->cheats->RevertUltimateSpeedrun();
+    }
 }
 
 void SMSM::ResetModeVariables() {
@@ -321,5 +328,9 @@ int SMSM::ClientConnect(bool* bAllowConnect, void* pEntity, const char* pszName,
 }
 void SMSM::ServerActivate(void* pEdictList, int edictCount, int clientMax) {
     engine->Cbuf_AddText(0, "script_execute speedrunmod_coop", 0);
+
+    // Runs on every map and save load, resetting anything changed since the last one.
+    if (this->mode == UltimateSpeedrun)
+        this->cheats->ApplyUltimateSpeedrun();
 }
 #pragma endregion
